@@ -30,6 +30,7 @@ usage() {
   bash deploy/control.sh update  — fast-forward main, затем deploy
   bash deploy/control.sh backup  — проверенный pg_dump в .local/backups/
   bash deploy/control.sh check-chat — один запрос Bro24 и безопасная проверка схемы
+  bash deploy/control.sh telegram — настроить кнопку Mini App в Telegram
   bash deploy/control.sh status  — все контейнеры, включая остановленные, и отсутствующие сервисы
   bash deploy/control.sh logs [web|worker|db|caddy] — последние 100 строк
 
@@ -158,7 +159,7 @@ main() {
   local action="${1:-help}"
   case "$action" in help|-h|--help) usage; return ;; esac
   [[ $# -le 2 ]] || die 'Слишком много аргументов; используйте help.'
-  case "$action" in deploy|update|backup|status|logs|check-chat) ;; *) die 'Неизвестная команда; используйте help.' ;; esac
+  case "$action" in deploy|update|backup|status|logs|check-chat|telegram) ;; *) die 'Неизвестная команда; используйте help.' ;; esac
   [[ $# -le 1 || "$action" == logs ]] || die 'Эта команда не принимает дополнительных аргументов.'
   stage preflight 'Проверяем Docker, Compose и конфигурацию без вывода секретов.'
   preflight
@@ -167,6 +168,7 @@ main() {
     update) lock_changes; update_checkout ;;
     backup) lock_changes; stage backup-db 'Сохраняем и проверяем резервную копию.'; backup_database ;;
     status) stage status 'Все контейнеры и состав серверного стека.'; status_report ;;
+    telegram) stage telegram 'Настраиваем и проверяем кнопку Telegram без вывода токена.'; timeout 60 "${COMPOSE[@]}" run --rm --no-deps -T --interactive=false telegram </dev/null ;;
     check-chat) stage check-chat 'Выполняем безопасную проверку контракта чата.'; timeout 45 "${COMPOSE[@]}" run --rm --no-deps -T --interactive=false web node deploy/check-chat.mjs </dev/null ;;
     logs)
       stage logs 'Последние сообщения выбранных сервисов.'

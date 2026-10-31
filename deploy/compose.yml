@@ -17,6 +17,17 @@ x-common: &common
   NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-in_app}
 
 services:
+  telegram:
+    image: narxpilot-web:local
+    profiles: [tools]
+    environment:
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TELEGRAM_MINI_APP_URL: ${TELEGRAM_MINI_APP_URL:-https://narxpilot.software-engineer.online/}
+    command: ["node", "deploy/telegram.mjs"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    logging: *logging
   db:
     image: postgres:18.4-bookworm
     environment:
