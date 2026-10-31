@@ -186,6 +186,13 @@ jobs:
         id: worker_image
         if: ${{ !cancelled() && steps.python_deps.outcome == 'success' }}
         run: bash deploy/tests/test-container-permissions.sh worker
+      - name: Пройти реальный серверный deploy дважды с PTY и локальным HTTPS
+        id: server_deploy
+        timeout-minutes: 20
+        if: ${{ !cancelled() && steps.web_image.outcome == 'success' && steps.worker_image.outcome == 'success' }}
+        env:
+          RUN_SERVER_DEPLOY_TESTS: 'true'
+        run: bash deploy/tests/test-server-deploy.sh
       - name: Запустить изолированную демобазу, web и worker
         id: demo_stack
         if: ${{ !cancelled() && steps.local_config.outcome == 'success' && steps.web_image.outcome == 'success' && steps.worker_image.outcome == 'success' }}
