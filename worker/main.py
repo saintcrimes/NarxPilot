@@ -51,7 +51,7 @@ async def _process_once(url):
                     suppliers={str(w['organization_id']) for w in warehouses.values() if str(w['id']) in event_warehouses}
                     for supplier in [None,*sorted(suppliers)]:
                         scope='platform' if supplier is None else 'own:'+supplier
-                        for location in ['all','malika','chilanzar']:
+                        for location in ['all','malika','chilanzar','food_city','sergeli']:
                             for terms in ['1','2-9','10+']:
                                 payload=aggregate(events,cutoff,scope='platform' if supplier is None else 'own',supplier=supplier,location=location,terms=terms,origin=expected,warehouses=warehouses)
                                 await conn.execute("""INSERT INTO analytics_snapshots(sku_id,scope,cohort,data_origin,as_of,data_cutoff,metric_definitions_version,payload)

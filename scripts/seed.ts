@@ -4,6 +4,7 @@ import { pool, transaction } from '../src/server/db';
 import { isDemo, validateDatabase } from '../src/server/config';
 import { Decimal, money } from '../src/domain/money';
 import { seedAdditionalDemoProducts } from './seed-additional';
+import { seedGroceryProducts } from './seed-groceries';
 export const demoId=(name:string)=>{
   const h=createHash('sha256').update('narxpilot-v1:'+name).digest('hex');
   return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`;
@@ -18,7 +19,7 @@ export async function seedDemo() {
     await db.query("SELECT pg_advisory_xact_lock(hashtext('demo-seed'))");
     const identity=(await db.query('SELECT * FROM database_identity WHERE singleton FOR UPDATE')).rows[0];
     if(identity?.data_origin!=='synthetic') throw new Error('Это не демобаза');
-    if(identity.seed_version) {const added=await seedAdditionalDemoProducts(db,demoId);console.log(`Основной seed сохранён. Добавлено новых синтетических SKU: ${added}; существующие данные не изменялись.`);return;}
+    if(identity.seed_version) {await seedAdditionalDemoProducts(db,demoId);const added=await seedGroceryProducts(db,demoId,anchor,salt);console.log(`История сохранена. Добавлено продуктовых демо-SKU: ${added}; старые заказы и остатки не изменялись.`);return;}
     if((await db.query('SELECT 1 FROM organizations LIMIT 1')).rowCount) throw new Error('Seed требует пустой демобазы');
     await db.query("INSERT INTO locations(id,name) VALUES('malika','Малика'),('chilanzar','Чиланзар')");
     const profiles=[['buyer','Магазин «Орион»','buyer'],['buyer2','Магазин «Вектор»','buyer'],['admin','Проверка данных','admin'],
@@ -95,7 +96,8 @@ export async function seedDemo() {
     await db.query('INSERT INTO outbox(event_id) SELECT event_id FROM business_events ON CONFLICT DO NOTHING');
     await db.query("UPDATE database_identity SET seed_version='v1',seed_anchor=$1 WHERE singleton",[anchor]);
     const added=await seedAdditionalDemoProducts(db,demoId);
-    console.log(`Демо: ${10+added} SKU, 5 поставщиков, 2 локации; 180 дней истории только для исходных 10 SKU; ${events.length-1} исходных событий`);
+    const groceries=await seedGroceryProducts(db,demoId,anchor,salt);
+    console.log(`Демо: ${groceries} продуктовых SKU; ${10+added} архивных SKU сохранены; 180 дней синтетических событий для продуктовой аналитики`);
   });
 }
 if(process.argv[1]?.replaceAll('\\','/').endsWith('/seed.ts')) {process.env.DATABASE_URL=process.env.MIGRATION_DATABASE_URL||process.env.DATABASE_URL;try {await seedDemo();} finally {await pool().end();}}

@@ -26,7 +26,7 @@ test('Поиск → сравнение → котировка → резерв 
   const meta=await openCatalog(page);
   const buyer=meta.profiles.find((p:{name:string})=>p.name.includes('Орион'));
   await switchProfile(page,buyer.user_id);
-  await page.getByLabel('Поиск точного товара').fill('iPhone 15 128');
+  await page.getByLabel('Поиск точного товара').fill('GR-001');
   await expect(page.locator('.product-card')).toHaveCount(1);
   await page.getByRole('link',{name:'Сравнить',exact:true}).click();
   await expect(page.locator('.offer-card')).toHaveCount(5);
@@ -34,6 +34,7 @@ test('Поиск → сравнение → котировка → резерв 
   await page.waitForURL(/\/orders\/[a-f0-9-]+$/);
   const id=new URL(page.url()).pathname.split('/')[2];
   const o=await (await page.request.get('/api/orders/'+id)).json();
+  expect(o.snapshot.unit).toBe('уп.');expect(o.snapshot.quantity).toBe(5);
   const seller=meta.profiles.find((p:{organization_id:string})=>p.organization_id===o.supplier_id);
   await switchProfile(page,seller.user_id);
   await page.getByRole('button',{name:'Подтвердить условия',exact:true}).click();
@@ -59,7 +60,7 @@ test('Флаг справки, локальные кнопки и очистка
   await page.getByRole('button',{name:'Как найти точный товар?',exact:true}).click();
   await expect(page.locator('.help-answer')).toContainText('В каталоге');
   if(meta.chatbot_provider!=='bro24'||!meta.chatbot_available){
-    await page.getByLabel('Вопрос о продукте').fill('сколько стоит сейчас iPhone');await page.getByRole('button',{name:'Отправить вопрос'}).click();
+    await page.getByLabel('Вопрос о продукте').fill('сколько стоит сейчас мука');await page.getByRole('button',{name:'Отправить вопрос'}).click();
     await expect(page.locator('.help-answer').last()).toContainText('нет текущих цен');
   }
   const origin=new URL(page.url()).origin;

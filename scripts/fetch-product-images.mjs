@@ -1,8 +1,9 @@
 import {readFile,mkdir,writeFile,access} from 'node:fs/promises';
 import {resolve} from 'node:path';
 const root=process.cwd();
-const photos=JSON.parse(await readFile(resolve(root,'src/data/product-images.json'),'utf8'));
+const photos=[...JSON.parse(await readFile(resolve(root,'src/data/product-images.json'),'utf8')),...JSON.parse(await readFile(resolve(root,'src/data/grocery-images.json'),'utf8'))];
 const allowed=new Set(['cdsassets.apple.com','samsungbrshop.vtexassets.com','shop.samsung.com','i02.appmifile.com','www.honor.com','www-file.honor.com','mtscdn.ru','storage.comprasmartphone.com','www.hp.com']);
+for(const host of ['ecomarket.ru','www.ecomarket.ru','arbuz.kz','www.mixmarkt-express.eu','images3.joy-sourcing.com','cdn.metro-cc.ru','www.sadaf.com','bonduelle.ru','www.bonduelle.ru','f.nooncdn.com'])allowed.add(host);
 async function fetchImage(address){
   let url=new URL(address);
   for(let hop=0;hop<4;hop++){

@@ -28,7 +28,7 @@ export async function GET(request:NextRequest,context:Context) {
       const identity=(await query('SELECT data_origin FROM database_identity WHERE singleton'))[0];
       requireThat(identity?.data_origin===origin(),'DATABASE_MODE_MISMATCH','Неверная база',503);
       const migrations=(await query('SELECT count(*)::integer n FROM schema_migrations'))[0].n;
-      requireThat(migrations>=4,'MIGRATIONS_PENDING','Требуются миграции',503);
+      requireThat(migrations>=5,'MIGRATIONS_PENDING','Требуются миграции',503);
       return {status:'ready',data_origin:identity.data_origin};
     }
     if(route==='session') {

@@ -7,5 +7,5 @@ export type Snapshot = {
   supplierId: string; quantity: number; unitPrice: string; delivery: string;
   fees: string; total: string; currency: 'UZS'; paymentTerms: 'bank_transfer';
   priceBasis: 'seller_final'; channel: 'B2B'; warranty: string; location: string;
-  deliveryDays: number; capturedAt: string;
+  deliveryDays: number; capturedAt: string; unit?:string;
 };
