@@ -1,0 +1,11 @@
+import 'dotenv/config';
+import { pool, query } from '../src/server/db';
+import { validateDatabase,isDemo } from '../src/server/config';
+process.env.DATABASE_URL=process.env.MIGRATION_DATABASE_URL||process.env.DATABASE_URL;
+const name=validateDatabase(process.env.DATABASE_URL!);
+if(!isDemo() || !name.startsWith('narxpilot_demo') || process.argv[2]!==`--confirm=${name}`) throw new Error(`Сброс разрешён только для явно названной демобазы: --confirm=${name}`);
+const identity=(await query('SELECT data_origin FROM database_identity'))[0];
+if(identity?.data_origin!=='synthetic') throw new Error('Сброс реальных данных запрещён');
+await query('DROP SCHEMA public CASCADE; CREATE SCHEMA public');
+await pool().end();
+console.log('Демобаза очищена. Выполните db:migrate и db:seed:demo.');

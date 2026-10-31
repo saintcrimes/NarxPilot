@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { total,median,vwap,percent,money } from '../../src/domain/money';
+test('A02: доставка и сборы считаются один раз',()=>assert.equal(total('8000000.15',5,'35000.10','100.05'),'40035100.90'));
+test('Decimal сохраняет точность больших сумм',()=>assert.equal(total('99999999999999.99',5,'0.01'),'499999999999999.96'));
+test('A09: неизвестная доставка означает неизвестный итог',()=>assert.equal(total('100',5,null),null));
+test('B04: медиана отличается от VWAP',()=>{assert.equal(median(['8000000','10000000']),'9000000.00');assert.equal(vwap([{price:'8000000',quantity:2},{price:'10000000',quantity:1}]),'8666666.67');});
+test('B01: падение объёма и отсутствие цены',()=>{assert.equal(percent(500,200),'-60.00');assert.equal(percent(200,100),'-50.00');assert.equal(percent(null,null),null);assert.equal(median([]),null);});
+test('Денежное округление half-up',()=>assert.equal(money('0.105'),'0.11'));
+test('Некорректное количество отклоняется',()=>{for(const q of [0,-1,1.5,NaN])assert.throws(()=>total('1',q,'0'));});

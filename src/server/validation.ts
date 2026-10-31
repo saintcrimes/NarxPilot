@@ -1,0 +1,10 @@
+import { z } from 'zod';
+export const uuid=z.string().uuid();
+export const amount=z.string().regex(/^\d{1,14}(\.\d{1,2})?$/, 'Сумма должна быть строкой с точностью до 2 знаков');
+export const positiveAmount=amount.refine(v=>!/^0+(\.0+)?$/.test(v),'Цена должна быть больше нуля');
+export const quantity=z.number().int().min(1).max(1000);
+export const location=z.enum(['all','malika','chilanzar']);
+export const createOrderSchema=z.object({skuId:uuid,offerId:uuid,quantity,baselineOfferId:uuid.optional()}).strict();
+export const orderActionSchema=z.object({quoteVersion:z.number().int().min(1).optional(),unitPrice:positiveAmount.optional(),delivery:amount.optional(),fees:amount.optional(),reason:z.string().trim().min(3).max(500).optional(),returnId:uuid.optional(),quantity:quantity.optional(),resalable:z.boolean().optional()}).strict();
+export const offerSchema=z.object({unitPrice:positiveAmount,delivery:amount.nullable(),fees:amount.default('0.00'),minQuantity:quantity,deliveryDays:z.number().int().min(0).max(60)}).strict();
+export const inventorySchema=z.object({warehouseId:uuid,skuId:uuid,kind:z.enum(['receive','writeoff','adjust','transfer','verify','external-sale']),quantity:z.number().int().min(-100000).max(100000),reason:z.string().trim().min(3).max(500),targetWarehouseId:uuid.optional()}).strict().refine(b=>b.kind==='adjust'?b.quantity!==0:b.kind==='verify'?b.quantity===0:b.quantity>0,'Некорректное количество движения');

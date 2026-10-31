@@ -1,0 +1,9 @@
+# Полный фиксированный набор runtime/test-зависимостей для Python 3.12.
+asyncpg==0.32.0
+tzdata==2025.2
+pytest==8.4.2
+iniconfig==2.1.0
+packaging==25.0
+pluggy==1.6.0
+pygments==2.19.2
+colorama==0.4.6; sys_platform == 'win32'

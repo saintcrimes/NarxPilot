@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+.local
+.cache
+.venv
+__pycache__
+test-results
+playwright-report
+*.tsbuildinfo

@@ -1,0 +1,140 @@
+{
+  "data_origin": "synthetic",
+  "description": "Сценарии для будущих тестов. Цены вымышленные, реальные продажи не отражены.",
+  "timezone": "Asia/Tashkent",
+  "cases": [
+    {
+      "id": "declining_sales_unknown_price",
+      "scope": "own_supplier",
+      "opening_stock": 1000,
+      "sales_by_complete_period": [
+        500,
+        200,
+        100
+      ],
+      "prices_uzs": [
+        null,
+        null,
+        null
+      ],
+      "other_inventory_movements": [],
+      "expected": {
+        "ending_stock": 200,
+        "net_units_sold": 800,
+        "sales_changes_pct": [
+          -60,
+          -50
+        ],
+        "price_trend": "insufficient_data",
+        "forecast_status": "insufficient_data"
+      }
+    },
+    {
+      "id": "declining_sales_stable_price",
+      "scope": "own_supplier",
+      "opening_stock": 1000,
+      "sales_by_complete_period": [
+        500,
+        200,
+        100
+      ],
+      "prices_uzs": [
+        "8000000.00",
+        "8000000.00",
+        "8000000.00"
+      ],
+      "expected": {
+        "ending_stock": 200,
+        "own_observed_price_change_pct": 0,
+        "public_market_trend": "insufficient_data",
+        "forecast_status": "insufficient_data"
+      }
+    },
+    {
+      "id": "declining_sales_rising_price",
+      "scope": "own_supplier",
+      "opening_stock": 1000,
+      "sales_by_complete_period": [
+        500,
+        200,
+        100
+      ],
+      "prices_uzs": [
+        "8000000.00",
+        "8100000.00",
+        "8200000.00"
+      ],
+      "expected": {
+        "ending_stock": 200,
+        "own_first_to_last_price_change_pct": 2.5,
+        "public_market_trend": "insufficient_data"
+      }
+    },
+    {
+      "id": "accepted_partial_return",
+      "opening_stock": 10,
+      "delivered_quantity": 5,
+      "accepted_resalable_return_quantity": 2,
+      "expected": {
+        "ending_on_hand": 7,
+        "effective_sold_quantity": 3
+      }
+    },
+    {
+      "id": "internal_transfer",
+      "warehouses_before": {
+        "A": 100,
+        "B": 50
+      },
+      "transfer_A_to_B": 20,
+      "expected": {
+        "warehouses_after": {
+          "A": 80,
+          "B": 70
+        },
+        "total_before": 150,
+        "total_after": 150,
+        "sales": 0
+      }
+    },
+    {
+      "id": "same_stock_two_offers",
+      "warehouse_sku_stock": 20,
+      "offers_referencing_stock": 2,
+      "expected": {
+        "aggregated_stock": 20
+      }
+    },
+    {
+      "id": "sparse_history",
+      "observed_days": 3,
+      "independent_sellers": 1,
+      "expected": {
+        "public_market_trend": "insufficient_data",
+        "forecast_status": "insufficient_data"
+      }
+    },
+    {
+      "id": "duplicate_receipt_event",
+      "event_id": "demo-receipt-001",
+      "delivered_quantity": 5,
+      "deliveries_of_event": 2,
+      "expected": {
+        "effective_sold_quantity": 5
+      }
+    },
+    {
+      "id": "last_item_race",
+      "available": 1,
+      "concurrent_reservation_quantities": [
+        1,
+        1
+      ],
+      "expected": {
+        "successful_reservations": 1,
+        "rejected_reservations": 1,
+        "available_after": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+name: narxpilot
+services:
+  db:
+    image: postgres:18.4-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-narxpilot_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup:env}
+      POSTGRES_DB: ${POSTGRES_DB:-narxpilot_demo}
+      TZ: UTC
+    volumes: ["database:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    build: .
+    env_file: .env
+    environment:
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    command: ["sh", "-c", "npm run db:migrate && npm run db:grants && if [ \"$$DEMO_MODE\" = true ]; then npm run db:seed:demo; fi"]
+    depends_on:
+      db: { condition: service_healthy }
+  web:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://narxpilot_web:${WEB_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    env_file: .env
+    environment:
+      WORKER_DATABASE_URL: postgresql://narxpilot_worker:${WORKER_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "python", "-m", "worker.health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+volumes:
+  database:

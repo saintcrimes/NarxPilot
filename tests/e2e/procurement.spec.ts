@@ -1,0 +1,43 @@
+import { test,expect } from '@playwright/test';
+test('Поиск → сравнение → котировка → резерв → отгрузка → приёмка → аналитика',async({page})=>{
+  await page.goto('/catalog');
+  const meta=await (await page.request.get('/api/session')).json();
+  const buyer=meta.profiles.find((p:{name:string})=>p.name.includes('Орион'));
+  await page.getByLabel('Демонстрационный аккаунт').selectOption(buyer.user_id);
+  await page.getByLabel('Поиск точного товара').fill('iPhone 15 128');
+  await expect(page.locator('.product-card')).toHaveCount(1);
+  await page.getByRole('link',{name:'Сравнить',exact:true}).click();
+  await expect(page.locator('.offer-card')).toHaveCount(5);
+  await page.getByRole('button',{name:'Отправить заявку'}).first().click();
+  await page.waitForURL(/\/orders\/[a-f0-9-]+$/);
+  const id=new URL(page.url()).pathname.split('/')[2];
+  const o=await (await page.request.get('/api/orders/'+id)).json();
+  const seller=meta.profiles.find((p:{organization_id:string})=>p.organization_id===o.supplier_id);
+  await page.getByLabel('Демонстрационный аккаунт').selectOption(seller.user_id);
+  await page.getByRole('button',{name:'Подтвердить условия',exact:true}).click();
+  await expect(page.locator('.status')).toHaveText('Условия подтверждены');
+  await page.getByLabel('Демонстрационный аккаунт').selectOption(buyer.user_id);
+  await page.getByRole('button',{name:'Согласен с условиями · зарезервировать'}).click();
+  await expect(page.locator('.status')).toHaveText('Товар в резерве');
+  await page.getByLabel('Демонстрационный аккаунт').selectOption(seller.user_id);
+  await page.getByRole('button',{name:'Подтвердить отгрузку',exact:true}).click();
+  await page.getByLabel('Демонстрационный аккаунт').selectOption(buyer.user_id);
+  await page.getByRole('button',{name:'Подтвердить приёмку',exact:true}).click();
+  await expect(page.locator('.status')).toHaveText('Приёмка подтверждена');
+  await page.reload();await expect(page.locator('.status')).toHaveText('Приёмка подтверждена');
+  await expect.poll(async()=>{const result=await (await page.request.get('/api/analytics/'+o.sku_id)).json();return result.pending_events;},{timeout:45000}).toBe(0);
+  await page.getByRole('link',{name:'Посмотреть аналитику'}).click();await expect(page.locator('.series-chart')).toBeVisible();
+});
+test('FAQ отключён по умолчанию; включённый FAQ работает локально и очищается после обновления',async({page})=>{
+  await page.goto('/catalog');const meta=await (await page.request.get('/api/session')).json();
+  if(!meta.chatbot_enabled){await expect(page.getByRole('button',{name:'Помощь',exact:true})).toHaveCount(0);return;}
+  await page.getByRole('button',{name:'Помощь',exact:true}).click();
+  const requests:string[]=[];page.on('request',r=>requests.push(r.url()));
+  await page.getByLabel('Вопрос о продукте').fill('Как найти точный товар?');await page.getByRole('button',{name:'Отправить вопрос'}).click();
+  await expect(page.locator('.help-answer')).toContainText('В каталоге');
+  await page.getByLabel('Вопрос о продукте').fill('сколько стоит сейчас iPhone');await page.getByRole('button',{name:'Отправить вопрос'}).click();
+  await expect(page.locator('.help-answer').last()).toContainText('нет текущих цен');
+  expect(requests.filter(url=>url.includes('/chat')||url.includes('openai')||!url.startsWith('http://localhost:3000'))).toHaveLength(0);
+  await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.reload();await page.getByRole('button',{name:'Помощь',exact:true}).click();await expect(page.locator('.help-question')).toHaveCount(0);
+});
