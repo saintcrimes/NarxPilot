@@ -50,7 +50,7 @@ export function HelpWidget({csrf,provider,available}:HelpWidgetProps) {
       const timeout=setTimeout(()=>controller.abort(),25000);
       try {
         const reply=readChatReply(await request<unknown>('help/chat',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({message}),signal:controller.signal}));
-        response=reply.provider==='local'?matchQuestion(localMessage):reply;source=reply.provider;fallback=reply.fallback;
+        response=reply.provider==='local'?{...matchQuestion(localMessage),...reply}:reply;source=reply.provider;fallback=reply.fallback;
       } catch {fallback=true;}
       finally {clearTimeout(timeout);pending.current=null;sending.current=false;if(mounted.current)setBusy(false);}
     }
