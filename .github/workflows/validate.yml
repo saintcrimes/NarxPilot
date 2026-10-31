@@ -178,14 +178,14 @@ jobs:
         run: |
           npm run setup:env
           docker compose --file docker-compose.yml config --quiet
-      - name: Собрать web-образ для сервера
+      - name: Собрать web из checkout 0600/0700 и проверить non-root runtime
         id: web_image
         if: ${{ !cancelled() && steps.web_build.outcome == 'success' }}
-        run: docker build --tag narxpilot-web:ci .
-      - name: Собрать worker-образ для сервера
+        run: bash deploy/tests/test-container-permissions.sh web
+      - name: Собрать worker из checkout 0600/0700 и проверить non-root runtime
         id: worker_image
         if: ${{ !cancelled() && steps.python_deps.outcome == 'success' }}
-        run: docker build --file worker/Dockerfile --tag narxpilot-worker:ci .
+        run: bash deploy/tests/test-container-permissions.sh worker
       - name: Запустить изолированную демобазу, web и worker
         id: demo_stack
         if: ${{ !cancelled() && steps.local_config.outcome == 'success' && steps.web_image.outcome == 'success' && steps.worker_image.outcome == 'success' }}
