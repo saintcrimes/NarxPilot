@@ -7,17 +7,15 @@ umask 077
 
 readonly repository='https://github.com/saintcrimes/NarxPilot.git'
 readonly node_image='node:22.22.0-bookworm-slim'
-readonly caddy_image='caddy:2.11.7-alpine'
 domain='narxpilot.software-engineer.online'
 install_dir='/opt/narxpilot'
 revision='main'
 dry_run=false
 temporary_key=''
-temporary_hash=''
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'Ошибка: %s\n' "$*" >&2; exit 1; }
-cleanup() { if [[ -n "$temporary_key" ]]; then rm -f -- "$temporary_key"; fi; if [[ -n "$temporary_hash" ]]; then rm -f -- "$temporary_hash"; fi; }
+cleanup() { if [[ -n "$temporary_key" ]]; then rm -f -- "$temporary_key"; fi; }
 trap cleanup EXIT
 trap 'status=$?; printf "Установка остановлена (код %s, строка %s). Существующие .env и тома не удалялись.\n" "$status" "$LINENO" >&2; exit "$status"' ERR
 
@@ -36,6 +34,7 @@ usage() {
 Другой Linux поддерживается при уже установленных Docker Engine, Compose v2, Git, curl и flock.
 Существующая установка Docker, .env и тома сохраняются. Незакоммиченные изменения
 или другая история Git останавливают обновление; reset/force/удаление файлов не используются.
+Сайт открывается публично в DEMO_MODE с синтетическими данными, без пароля доступа.
 HELP
 }
 
@@ -69,6 +68,7 @@ if "$dry_run"; then
   say "Каталог: $install_dir; revision: $revision"
   say "Домен: https://$domain"
   say 'План: проверить Docker/Git → безопасно получить код → настроить .env → deploy/control.sh deploy.'
+  say 'Публичный DEMO_MODE: синтетические данные, без браузерного запроса пароля.'
   say 'Проверка аргументов завершена; сеть, файлы и службы не изменялись.'
   exit 0
 fi
@@ -166,16 +166,6 @@ cd -- "$install_dir"
 say "Код получен: $(git_safe rev-parse --short=12 HEAD). Настройка https://$domain."
 configure() { docker run --rm --pull=missing --network none --mount "type=bind,source=$install_dir,target=/workspace" --workdir /workspace "$node_image" node deploy/configure.mjs --domain "$domain" "$@"; }
 configure
-if [[ -f .local/deploy/basic-auth-password && ! -s .local/deploy/auth-hash ]]; then
-  [[ ! -L .local/deploy/auth-hash && ! -L .local/deploy/basic-auth-password ]] || fail 'Файлы доступа не должны быть символическими ссылками.'
-  temporary_hash=$(mktemp "$install_dir/.local/deploy/auth-hash.XXXXXX")
-  chmod 0600 "$temporary_hash"
-  docker run --rm --pull=missing --network none --mount "type=bind,source=$install_dir/.local/deploy,target=/run/narxpilot,readonly" --entrypoint sh "$caddy_image" -c 'caddy hash-password < /run/narxpilot/basic-auth-password' > "$temporary_hash"
-  [[ -s "$temporary_hash" ]] || fail 'Caddy не создал хеш доступа.'
-  mv -- "$temporary_hash" .local/deploy/auth-hash
-  temporary_hash=''
-fi
-configure --finalize
 bash deploy/control.sh deploy
-if [[ -f .local/deploy/access.json ]]; then say "Данные входа находятся только на сервере: $install_dir/.local/deploy/access.json"; fi
+say 'Сайт доступен публично в DEMO_MODE с синтетическими данными. Браузерный пароль не требуется.'
 say 'Установка завершена. Данные и секреты остаются на сервере; команды управления описаны в docs/DEPLOYMENT.md.'

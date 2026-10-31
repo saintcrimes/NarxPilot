@@ -6,7 +6,8 @@ bash -n "$script"
 bash "$script" --help >/dev/null
 bash "$script" --dry-run | grep -Fq 'narxpilot.software-engineer.online'
 bash "$script" --dry-run --domain EXAMPLE.COM --dir /srv/narxpilot --ref release/v1 | grep -Fq 'https://example.com'
-checks=4
+bash "$script" --dry-run | grep -Fq 'без браузерного запроса пароля'
+checks=5
 for invalid_domain in 'https://example.com' 'example.com:443' 'example..com' '-example.com' 'example.com/' 'example.com.'; do
   if bash "$script" --dry-run --domain "$invalid_domain" >/dev/null 2>&1; then printf 'Unexpected domain acceptance: %s\n' "$invalid_domain" >&2; exit 1; fi
   checks=$((checks+1))

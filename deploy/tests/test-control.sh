@@ -64,6 +64,10 @@ not_has() { ! has "$1"; }
 
 new_case; run_ok deploy
 has 'build --pull web migrate worker'; has 'pg_dump'; has 'pg_restore --list'; has 'run --rm --no-deps -T --interactive=false migrate'; has 'worker python -m worker.health'
+has 'up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 caddy'
+not_has 'down'; not_has 'volume rm'
+grep -q 'демостенд открыт для всех без HTTP-пароля' "$CASE/stdout"
+! grep -q 'access.json\|закрыт паролем' "$CASE/stdout"
 build_line=$(grep -n 'build --pull' "$MOCK_LOG" | cut -d: -f1)
 dump_line=$(grep -n 'pg_dump' "$MOCK_LOG" | cut -d: -f1)
 migrate_line=$(grep -n 'run --rm --no-deps -T --interactive=false migrate' "$MOCK_LOG" | cut -d: -f1)

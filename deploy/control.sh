@@ -126,15 +126,16 @@ deploy_stack() {
   timeout 600 "${COMPOSE[@]}" run --rm --no-deps -T --interactive=false migrate </dev/null
   stage start-app 'Запускаем web и worker; ожидаем healthchecks.'
   dc up -d --no-build --no-deps --wait --wait-timeout 180 web worker
-  stage start-proxy 'Запускаем постоянный HTTPS-прокси Caddy.'
-  dc up -d --no-build --no-deps --wait --wait-timeout 120 caddy
+  stage start-proxy 'Пересоздаём HTTPS-прокси с актуальным Caddyfile; тома сертификатов сохраняются.'
+  # Git may replace the mounted file's inode; recreation mounts the current version.
+  dc up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 caddy
   stage verify-app 'Проверяем готовность API и heartbeat worker.'
   timeout 30 "${COMPOSE[@]}" exec -T --interactive=false web node -e "fetch('http://localhost:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" </dev/null
   timeout 30 "${COMPOSE[@]}" exec -T --interactive=false worker python -m worker.health </dev/null
   stage status 'Итоговое состояние сервисов.'
   status_report
   note 'Контейнеры и внутренние healthchecks готовы. Внешний HTTPS зависит от DNS и доступности портов 80/443.'
-  note 'Доступ к демо закрыт паролем. Данные доступа: .local/deploy/access.json; не публикуйте этот файл.'
+  note 'Синтетический демостенд открыт для всех без HTTP-пароля. Права бизнес-операций проверяются API.'
 }
 
 update_checkout() {

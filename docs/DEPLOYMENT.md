@@ -1,6 +1,6 @@
 # Сервер NarxPilot
 
-Домен: **narxpilot.software-engineer.online**. Установщик получает код из `https://github.com/saintcrimes/NarxPilot.git`, сохраняет секреты на сервере, собирает закреплённые зависимости и запускает Caddy, web, worker и отдельный PostgreSQL. Это защищённый паролем **демонстрационный стенд**, пока в приложении используется переключение демоаккаунтов. Данные синтетические; это не запуск реальных закупок без production-аутентификации.
+Домен: **narxpilot.software-engineer.online**. Установщик получает код из `https://github.com/saintcrimes/NarxPilot.git`, сохраняет секреты на сервере, собирает закреплённые зависимости и запускает Caddy, web, worker и отдельный PostgreSQL. По запросу владельца это публичный **демонстрационный стенд без браузерного пароля**. В приложении доступны демонстрационные профили покупателя/поставщика, данные синтетические. Для реальных организаций требуется отдельная production-аутентификация.
 
 ## Перед запуском
 
@@ -18,13 +18,9 @@
 curl -fsSL https://raw.githubusercontent.com/saintcrimes/NarxPilot/main/deploy/install.sh | sudo bash
 ```
 
-Код и серверный `.env` будут в `/opt/narxpilot`. Установщик создаёт случайные отдельные пароли БД/ролей/сессии и доступ к стенду. Секреты не печатаются в журнал. После успеха откройте `https://narxpilot.software-engineer.online` и используйте логин/пароль из локального файла:
+Код и серверный `.env` будут в `/opt/narxpilot`. Установщик создаёт случайные отдельные пароли БД/ролей/сессии; они остаются на сервере и не печатаются в журнал. После успеха откройте `https://narxpilot.software-engineer.online`: HTTP Basic Auth не используется, логин/пароль браузеру не нужны. Старые файлы доступа и переменные `DEPLOY_BASIC_*` от прежней установки могут оставаться на диске, но больше не используются и автоматически не удаляются.
 
-```bash
-sudo cat /opt/narxpilot/.local/deploy/access.json
-```
-
-Этот файл не публикуется. Caddy получает только bcrypt-хеш; пароль HTTP-доступа не передаётся приложению. После входа в стенд доступны демонстрационные профили покупателя/поставщика. HTTPS выдаётся и продлевается Caddy автоматически при правильном DNS и доступных портах; успешный внутренний healthcheck сам по себе не доказывает выпуск сертификата.
+HTTPS выдаётся и продлевается Caddy автоматически при правильном DNS и доступных портах; успешный внутренний healthcheck сам по себе не доказывает выпуск сертификата.
 
 Для предварительного просмотра сохраните и прочитайте скрипт. `--dry-run` проверяет аргументы без сети и изменения системы:
 
@@ -106,6 +102,25 @@ printf 'DEPLOY_EXIT=%s\n' "$?"
 
 Закрытый stdin применяется и к уже загруженным функциям старой версии `update`; новые функции доступны со следующего запуска скрипта. При повторной ошибке нужны последнее сообщение с этапом/кодом и `status`. Содержимое `.env` и файла паролей передавать не нужно.
 
+### Azure: контейнеры healthy, но домен не открывается
+
+Проверьте, что A-запись домена указывает на публичный IPv4 этой VM. В Azure откройте **Virtual machine → Networking → Network settings → Inbound port rules** и разрешите входящий **TCP 80 и 443**. Если NSG назначены и подсети, и сетевому интерфейсу, разрешение должно действовать на обоих уровнях. [Диагностика NSG в Microsoft Learn](https://learn.microsoft.com/en-us/azure/virtual-network/diagnose-network-traffic-filter-problem).
+
+После изменения правил проверьте HTTPS. Если вместо таймаута появился `ERR_SSL_PROTOCOL_ERROR`, соединение уже достигает TLS, но нужен журнал Caddy: успешный admin-healthcheck не подтверждает наличие публичного сертификата. Если Caddy запускался при закрытых портах, после их открытия можно повторить получение сертификата перезапуском только прокси:
+
+```bash
+docker restart narxpilot-server-caddy-1
+bash /opt/narxpilot/deploy/control.sh logs caddy
+```
+
+В журнале ищите результат получения сертификата или конкретную ошибку ACME. Ошибку сертификата исправляют на сервере; обход предупреждения браузера не требуется. Для проверки HTTPS непосредственно на VM, сохраняя проверку сертификата и правильное имя домена:
+
+```bash
+curl -I --max-time 15 --resolve narxpilot.software-engineer.online:443:127.0.0.1 https://narxpilot.software-engineer.online
+```
+
+Ожидаемый ответ готового публичного стенда — `200` без пароля и без `WWW-Authenticate`. При обновлении с прежней версии Caddy пересоздаётся с новым конфигурационным файлом; volumes сертификатов сохраняются. Если старое окно пароля уже открыто, закройте его кнопкой Cancel и обновите страницу после завершения deploy. `.env` с компьютера не попадает в GitHub: API-ключ добавляется в существующую серверную `/opt/narxpilot/.env`, с сохранением созданных паролей базы. Закупки и аналитика работают независимо от ключа Bro24.
+
 ### Границы проверок
 
 - Workflow `.github/workflows/validate.yml` создаёт настоящий lockfile при его отсутствии, выполняет тесты/типы/сборку и проверяет Docker-образы. Запуск CI не является деплоем на ваш сервер.
@@ -115,4 +130,4 @@ printf 'DEPLOY_EXIT=%s\n' "$?"
 - Полный Linux CI прошёл, включая настоящий Caddy, Compose и 6 desktop/mobile E2E. В этом сеансе нет SSH-доступа к вашему серверу: DNS, выпуск сертификата, firewall и реальное восстановление БД там не проверены. Фактические результаты CI — в [VERIFICATION.md](VERIFICATION.md).
 - Автоустановка принимает только отдельную `narxpilot_demo` / `narxpilot_demo_*` базу. При live/test-конфигурации она останавливается, сохраняя файл. Настоящий production-вход остаётся отдельной задачей.
 
-Основа настройки: [официальная установка Docker для Ubuntu](https://docs.docker.com/engine/install/ubuntu/), [Debian](https://docs.docker.com/engine/install/debian/), [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https), [Caddy basic_auth](https://caddyserver.com/docs/caddyfile/directives/basic_auth), [безопасное чтение пароля из stdin](https://caddyserver.com/docs/command-line#caddy-hash-password).
+Основа настройки: [официальная установка Docker для Ubuntu](https://docs.docker.com/engine/install/ubuntu/), [Debian](https://docs.docker.com/engine/install/debian/), [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https).

@@ -78,16 +78,12 @@ JS
 )
 export COMPOSE_DISABLE_ENV_FILE=1
 (cd -- "$fixture" && node deploy/configure.mjs --domain narxpilot.localhost)
-docker run --rm --network none --mount "type=bind,source=$fixture/.local/deploy,target=/run/narxpilot,readonly" --entrypoint sh caddy:2.11.7-alpine -c 'caddy hash-password < /run/narxpilot/basic-auth-password' > "$fixture/.local/deploy/auth-hash"
-(cd -- "$fixture" && node deploy/configure.mjs --domain narxpilot.localhost --finalize)
 node --input-type=module - "$fixture" <<'JS'
-import {readFileSync,writeFileSync} from 'node:fs';
+import {existsSync,readFileSync} from 'node:fs';
 import {parseEnv} from 'node:util';
 const root=process.argv[2],env=parseEnv(readFileSync(root+'/.env','utf8'));
 if(env.BRO24_API_KEY||env.OPENAI_API_KEY||env.CHATBOT_ENABLED!=='false'||env.CHATBOT_PROVIDER!=='local'||env.LLM_PROVIDER!=='disabled')throw new Error('Only a fixture with disabled external providers is allowed');
-const access=JSON.parse(readFileSync(root+'/.local/deploy/access.json','utf8'));
-if(!/^[A-Za-z0-9_-]+$/.test(access.username)||!/^[A-Za-z0-9_-]+$/.test(access.password))throw new Error('Unexpected generated access format');
-writeFileSync(root+'/.local/deploy/curl-auth.conf',`user = "${access.username}:${access.password}"\n`,{mode:0o600});
+for(const name of ['auth-hash','basic-auth-password','access.json'])if(existsSync(root+'/.local/deploy/'+name))throw new Error('Public demo setup must not create browser credentials');
 JS
 [[ $(stat -c '%a' "$fixture/.env") == 600 ]] || { printf 'Fixture .env must remain private.\n' >&2; exit 1; }
 dc config --quiet
@@ -147,24 +143,26 @@ database_counts() {
   dc exec -T db sh -ec 'exec psql -X --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" -v ON_ERROR_STOP=1 -Atc "$1"' sh "SELECT json_build_object('origin',(SELECT data_origin FROM database_identity WHERE singleton),'migrations',(SELECT count(*) FROM schema_migrations),'events',(SELECT count(*) FROM business_events),'users',(SELECT count(*) FROM users))" </dev/null
 }
 assert_healthy
+initial_proxy_id=$(dc ps --quiet caddy)
 database_counts > "$fixture/.local/counts-first.json"
 dc exec -T caddy cat /data/caddy/pki/authorities/local/root.crt > "$fixture/.local/caddy-root.crt" </dev/null
 CURL=(curl --silent --show-error --max-time 20 --noproxy '*' --resolve narxpilot.localhost:443:127.0.0.1 --cacert "$fixture/.local/caddy-root.crt")
-[[ $("${CURL[@]}" --output /dev/null --write-out '%{http_code}' https://narxpilot.localhost/api/health/ready) == 401 ]] || { printf 'Server must reject access without basic authentication.\n' >&2; exit 1; }
-"${CURL[@]}" --fail --config "$fixture/.local/deploy/curl-auth.conf" https://narxpilot.localhost/api/health/ready > "$fixture/.local/ready.json"
-"${CURL[@]}" --fail --config "$fixture/.local/deploy/curl-auth.conf" https://narxpilot.localhost/catalog > "$fixture/.local/catalog.html"
+[[ $("${CURL[@]}" --dump-header "$fixture/.local/ready.headers" --output "$fixture/.local/ready.json" --write-out '%{http_code}' https://narxpilot.localhost/api/health/ready) == 200 ]] || { printf 'Public demo HTTPS must return 200 without credentials.\n' >&2; exit 1; }
+"${CURL[@]}" --fail --dump-header "$fixture/.local/catalog.headers" https://narxpilot.localhost/catalog > "$fixture/.local/catalog.html"
 node --input-type=module - "$fixture" <<'JS'
 import {readFileSync} from 'node:fs';
 const read=name=>readFileSync(process.argv[2]+'/.local/'+name,'utf8');
 const ready=JSON.parse(read('ready.json')),counts=JSON.parse(read('counts-first.json'));
 if(ready.status!=='ready'||ready.data_origin!=='synthetic'||counts.origin!=='synthetic'||counts.migrations<3||counts.events<1||counts.users<1)throw new Error('The real server did not migrate and seed its synthetic database');
 if(!read('catalog.html').includes('NarxPilot'))throw new Error('Caddy did not serve the application page');
+for(const name of ['ready.headers','catalog.headers'])if(/^www-authenticate:/im.test(read(name)))throw new Error('The public demo must not challenge the browser for credentials');
 JS
-printf 'Real server deploy passed: migrations, seed, four healthy services, trusted local HTTPS, basic auth 401/200 and catalog.\n'
+printf 'Real server deploy passed: migrations, seed, four healthy services, anonymous HTTPS 200, no browser auth challenge and catalog.\n'
 
 [[ ! -d "$fixture/.local/backups" ]] || { printf 'An empty first deployment must not create a backup.\n' >&2; exit 1; }
 run_in_pty "$fixture/.local/deploy-second.log" 900 bash "$fixture/deploy/control.sh" deploy
 assert_healthy
+[[ $(dc ps --quiet caddy) != "$initial_proxy_id" ]] || { printf 'Repeat deployment must recreate Caddy to reload replaced configuration files.\n' >&2; exit 1; }
 database_counts > "$fixture/.local/counts-second.json"
 node --input-type=module - "$fixture" <<'JS'
 import {readFileSync,readdirSync,statSync} from 'node:fs';
@@ -178,5 +176,6 @@ const log=read('deploy-second.log').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
 const backup=log.search(/^\[backup-db\] /m),migration=log.search(/^\[migrate\] /m);
 if(backup<0||migration<backup)throw new Error('Backup must precede migration on repeat deploy');
 JS
-"${CURL[@]}" --fail --config "$fixture/.local/deploy/curl-auth.conf" https://narxpilot.localhost/api/health/ready >/dev/null
-printf 'Repeat server deploy passed: verified pg_dump before migration, unchanged seed/events, healthy services and HTTPS.\n'
+# CURL still trusts the original CA, proving recreation preserved certificate data.
+"${CURL[@]}" --fail https://narxpilot.localhost/api/health/ready >/dev/null
+printf 'Repeat server deploy passed: verified pg_dump before migration, unchanged seed/events, recreated proxy, preserved certificate trust and public HTTPS.\n'

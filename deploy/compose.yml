@@ -99,8 +99,6 @@ services:
     image: caddy:2.11.7-alpine
     environment:
       NARXPILOT_DOMAIN: ${NARXPILOT_DOMAIN:?Domain required}
-      DEPLOY_BASIC_USER: ${DEPLOY_BASIC_USER:?Access user required}
-      DEPLOY_BASIC_HASH: ${DEPLOY_BASIC_HASH:?Run configure --finalize}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

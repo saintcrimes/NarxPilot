@@ -17,8 +17,7 @@ const composeAvailable=!version.error&&version.status===0;
 const composeSkip=!composeAvailable&&!realDocker?'Docker Compose CLI отсутствует; проверка явно пропущена':false;
 const fakeKey='fake-compose-bro24-$literal-never-real';
 const fakeOpenAIKey='fake-compose-openai-never-real';
-const fakeHash='$2a$14$'+'a'.repeat(53); // Only syntax fixture, never used for server access.
-let fixture,environment,config,hash,childEnvironment,composeResourcesStarted=false;
+let fixture,environment,config,childEnvironment,composeResourcesStarted=false;
 
 function command(args,{input,timeout=30000}={}){
   const result=spawnSync('docker',args,{input,encoding:'utf8',timeout,maxBuffer:4*1024*1024,windowsHide:true,env:childEnvironment??process.env});
@@ -40,13 +39,6 @@ before(async()=>{
   let text=await readFile(join(fixture,'.env'),'utf8');
   text=text.replace(/^BRO24_API_KEY=.*$/m,"BRO24_API_KEY='"+fakeKey+"'").replace(/^OPENAI_API_KEY=.*$/m,"OPENAI_API_KEY='"+fakeOpenAIKey+"'");
   await writeFile(join(fixture,'.env'),text,{mode:0o600});
-  if(realDocker){
-    const password=await readFile(join(fixture,'.local','deploy','basic-auth-password'),'utf8');
-    hash=command(['run','--rm','-i','--network','none','caddy:2.11.7-alpine','caddy','hash-password'],{input:password,timeout:180000}).trim();
-    assert.match(hash,/^\$2[aby]\$\d{2}\$[A-Za-z0-9./]{53}$/,'Caddy должен вернуть bcrypt-хеш');
-  }else hash=fakeHash;
-  await writeFile(join(fixture,'.local','deploy','auth-hash'),hash+'\n',{mode:0o600});
-  await configure({root:fixture,domain:'deploy-check.example.com',finalize:true});
   environment=parseEnv(await readFile(join(fixture,'.env'),'utf8'));
   childEnvironment={...process.env};
   // Host variables must not override the isolated fixture or bring actual keys into tests.
@@ -85,15 +77,14 @@ test('Серверный Compose публикует только Caddy 80/443; P
   assert.ok(Object.keys(config.volumes).includes('database'));
 });
 
-test('Compose разделяет ключи и роли; сохраняет HTTPS Origin и буквальные $ в API-ключе/bcrypt',{skip:composeSkip},()=>{
+test('Compose разделяет ключи и роли; сохраняет HTTPS Origin и буквальные $ в API-ключе',{skip:composeSkip},()=>{
   const web=config.services.web.environment,worker=config.services.worker.environment,migrate=config.services.migrate.environment,caddy=config.services.caddy.environment;
   assert.equal(web.APP_ORIGIN,'https://deploy-check.example.com');
   assert.equal(web.DEMO_MODE,'true');
   assert.equal(literal(web.BRO24_API_KEY),fakeKey);
   assert.equal(web.OPENAI_API_KEY,fakeOpenAIKey);
-  assert.equal(literal(caddy.DEPLOY_BASIC_HASH),hash);
-  assert.equal(caddy.DEPLOY_BASIC_USER,environment.DEPLOY_BASIC_USER);
-  assert.deepEqual(Object.keys(caddy).sort(),['DEPLOY_BASIC_HASH','DEPLOY_BASIC_USER','NARXPILOT_DOMAIN']);
+  assert.equal(caddy.NARXPILOT_DOMAIN,'deploy-check.example.com');
+  assert.deepEqual(Object.keys(caddy),['NARXPILOT_DOMAIN']);
   const webUrl=new URL(web.DATABASE_URL),workerUrl=new URL(worker.WORKER_DATABASE_URL),ownerUrl=new URL(migrate.MIGRATION_DATABASE_URL);
   assert.equal(webUrl.username,'narxpilot_web');assert.equal(webUrl.password,environment.WEB_DB_PASSWORD);
   assert.equal(workerUrl.username,'narxpilot_worker');assert.equal(workerUrl.password,environment.WORKER_DB_PASSWORD);
@@ -104,8 +95,17 @@ test('Compose разделяет ключи и роли; сохраняет HTTP
   for(const key of ['SESSION_SECRET','OPENAI_API_KEY','BRO24_API_KEY','DEPLOY_BASIC_HASH'])assert.equal(migrate[key],undefined,`Migrator не получает ${key}`);
 });
 
-test('Реальный Caddy принимает конфигурацию HTTPS/basic_auth из Compose',{skip:realDocker?composeSkip:'Требует RUN_DOCKER_TESTS=true и доступный Docker daemon',timeout:180000},()=>{
-  assert.notEqual(hash,fakeHash,'Контейнерный тест должен использовать настоящий bcrypt');
+test('Публичный Caddyfile не содержит HTTP-пароль или ответ 401',async()=>{
+  const caddyfile=await readFile(join(root,'deploy','Caddyfile'),'utf8');
+  assert.doesNotMatch(caddyfile,/\b(?:basic_auth|basicauth|forward_auth|DEPLOY_BASIC_USER|DEPLOY_BASIC_HASH)\b|\brespond\s+401\b/);
+  assert.match(caddyfile,/reverse_proxy\s+web:3000/);
+});
+
+test('Реальный Caddy принимает публичную HTTPS-конфигурацию без обработчика authentication',{skip:realDocker?composeSkip:'Требует RUN_DOCKER_TESTS=true и доступный Docker daemon',timeout:180000},()=>{
   composeResourcesStarted=true;
-  command(composeArgs('run','--rm','--no-deps','-T','caddy','caddy','validate','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'),{timeout:180000});
+  command(composeArgs('run','--rm','--no-deps','-T','--interactive=false','caddy','caddy','validate','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'),{timeout:180000});
+  const adapted=JSON.parse(command(composeArgs('run','--rm','--no-deps','-T','--interactive=false','caddy','caddy','adapt','--config','/etc/caddy/Caddyfile','--adapter','caddyfile'),{timeout:180000}));
+  const handlers=[];
+  function visit(value){if(value&&typeof value==='object'){if(typeof value.handler==='string')handlers.push(value.handler);for(const child of Object.values(value))visit(child);}}
+  visit(adapted);assert.ok(handlers.includes('reverse_proxy'));assert.ok(!handlers.includes('authentication'));
 });
