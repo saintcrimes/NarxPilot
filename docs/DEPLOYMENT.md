@@ -82,7 +82,7 @@ sudo bash /opt/narxpilot/deploy/control.sh update
 - Workflow `.github/workflows/validate.yml` создаёт настоящий lockfile при его отсутствии, выполняет тесты/типы/сборку и проверяет Docker-образы. Запуск CI не является деплоем на ваш сервер.
 - `node --test deploy/tests/*.test.mjs` проверяет конфигурацию/секреты и Compose. `RUN_DOCKER_TESTS=true` дополнительно включает реальную проверку Caddy в контейнере.
 - Bash-тесты проверяют аргументы и порядок/failure-сценарии через подставленные CLI, без изменения хоста.
-- В этом сеансе нет SSH-доступа к вашему серверу: DNS, выпуск сертификата, firewall и реальное восстановление БД там не проверены. Фактические результаты CI — в [VERIFICATION.md](VERIFICATION.md).
+- Полный Linux CI прошёл, включая настоящий Caddy, Compose и 6 desktop/mobile E2E. В этом сеансе нет SSH-доступа к вашему серверу: DNS, выпуск сертификата, firewall и реальное восстановление БД там не проверены. Фактические результаты CI — в [VERIFICATION.md](VERIFICATION.md).
 - Автоустановка принимает только отдельную `narxpilot_demo` / `narxpilot_demo_*` базу. При live/test-конфигурации она останавливается, сохраняя файл. Настоящий production-вход остаётся отдельной задачей.
 
 Основа настройки: [официальная установка Docker для Ubuntu](https://docs.docker.com/engine/install/ubuntu/), [Debian](https://docs.docker.com/engine/install/debian/), [Caddy Automatic HTTPS](https://caddyserver.com/docs/automatic-https), [Caddy basic_auth](https://caddyserver.com/docs/caddyfile/directives/basic_auth), [безопасное чтение пароля из stdin](https://caddyserver.com/docs/command-line#caddy-hash-password).
