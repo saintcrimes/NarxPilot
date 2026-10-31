@@ -4,8 +4,11 @@
   {"model":"Galaxy S24","file":"galaxy-s24.jpg","url":"https://samsungbrshop.vtexassets.com/arquivos/ids/249008-800-auto?v=638793874886700000","source":"https://shop.samsung.com/br/galaxy-s24/p"},
   {"model":"Galaxy A55","file":"galaxy-a55.jpg","url":"https://samsungbrshop.vtexassets.com/arquivos/ids/229995-800-auto?v=638448298955530000","source":"https://shop.samsung.com/br/galaxy-a55/p"},
   {"model":"Galaxy S23","file":"galaxy-s23.png","url":"https://shop.samsung.com/latin/cac/pub/media/catalog/product/0/0/00-diamot-sm-s911_galaxys23_all-name_thumb_3.png","source":"https://shop.samsung.com/latin/cac/cr/galaxy-s23-256gb.html"},
-  {"model":"Redmi Note 13","file":"redmi-note-13.png","url":"https://i02.appmifile.com/mi-com-product/fly-birds/redmi-note-13/PC/1459c3984bb19f5d07535f33419950b7.png","source":"https://www.mi.com/global/product/redmi-note-13/"},
+  {"model":"Redmi Note 13","file":"redmi-note-13.png","url":"https://storage.comprasmartphone.com/smartphones/xiaomi-redmi-note-13.png","source":"https://comprasmartphone.com/telefonos/xiaomi-redmi-note-13"},
   {"model":"14T","file":"xiaomi-14t.png","url":"https://i02.appmifile.com/133_item_kr/23/03/2025/731b69da8b7d181b9b60b93c955f3490.png","source":"https://www.mi.com/kr/product/xiaomi-14t/buy/"},
   {"model":"200","file":"honor-200.png","url":"https://www.honor.com/content/dam/honor/uk/product-list/smartphone/honor-200/honor-200-white-list.png","source":"https://www.honor.com/uk/phones/honor-200/buy/"},
-  {"model":"12 Pro","file":"realme-12-pro.png","url":"https://mtscdn.ru/upload/iblock/cee/12_pro_white.png","source":"https://shop.mts.ru/product/smartfon-realme-12-pro-5g-8-128-gb-bezhevyj"}
+  {"model":"12 Pro","file":"realme-12-pro.png","url":"https://mtscdn.ru/upload/iblock/cee/12_pro_white.png","source":"https://shop.mts.ru/product/smartfon-realme-12-pro-5g-8-128-gb-bezhevyj"},
+  {"model":"MacBook Air 13 M3","file":"macbook-air-m3.png","url":"https://cdsassets.apple.com/live/7WUAS350/images/tech-specs/mba_13_m3_2024_hero.png","source":"https://support.apple.com/en-au/118551"},
+  {"model":"LaserJet M110w","file":"hp-laserjet-m110w.png","url":"https://www.hp.com/ca-en/shop/media/catalog/product/f/9/f9f09209-daef-4e1c-bf6d-d32823750eec.png?bg-color=ffffff&fit=bounds&format=png&image-type=image&quality=90&store=ca-en&type=image-product&width=600","source":"https://www.hp.com/ca-en/shop/products/printers/hp-laserjet-m110w-wireless-black-white-laser-printer-7md66f-bgj"},
+  {"model":"MS23K3513AK","file":"samsung-microwave.png","url":"https://shop.samsung.com/latin/pub/media/catalog/product/m/s/ms23k3513ak_001_front_black_2.png","source":"https://shop.samsung.com/latin/pa/ms23k3513ak-ap-microondas-con-quick-defrost-23l-pa.html"}
 ]

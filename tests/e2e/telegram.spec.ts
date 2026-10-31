@@ -1,7 +1,7 @@
 import { test,expect } from '@playwright/test';
 
 type BridgeState={calls:string[];backVisible:boolean;back:(()=>void)|null};
-type BridgeWindow=Window&{__narxTelegramState:BridgeState};
+type BridgeWindow=Window&typeof globalThis&{__narxTelegramState:BridgeState};
 
 test('Telegram: presentation bridge, safe-area и Назад без доверия к initData',async({page})=>{
   // Only the official SDK is replaced; the NarxPilot app/session API remains real.
