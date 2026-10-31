@@ -1,0 +1,175 @@
+name: Проверка NarxPilot
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: narxpilot-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lockfile:
+    name: Подготовить закреплённые npm-зависимости
+    if: github.repository == 'saintcrimes/NarxPilot' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    outputs:
+      revision: ${{ steps.revision.outputs.sha }}
+    steps:
+      - name: Получить исходный коммит
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - name: Node.js 22.22.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - name: Создать настоящий lockfile, если он отсутствует
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f package-lock.json ]]; then
+            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          fi
+          # В job с правом записи запрещены lifecycle-скрипты зависимостей.
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Сохранить lockfile как отдельный артефакт
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-lockfile
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Зафиксировать только новый lockfile без перезаписи истории
+        id: revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- package-lock.json
+          if ! git diff --cached --quiet -- package-lock.json; then
+            git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+            if [[ "$(git rev-parse HEAD)" != "$(git rev-parse refs/remotes/origin/main)" ]]; then
+              echo 'Ветка main уже изменилась. Lockfile сохранён в артефакте; повторите проверку нового коммита.' >&2
+              exit 1
+            fi
+            git -c user.name='github-actions[bot]' \
+                -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+                commit -m 'chore: lock verified npm dependency resolution' -- package-lock.json
+            git push origin HEAD:refs/heads/main
+          fi
+          printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Тесты, типы и сборка
+    needs: lockfile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      DEMO_MODE: 'true'
+      DEMO_ANCHOR_DATE: '2026-10-31'
+      CHATBOT_ENABLED: 'false'
+      CHATBOT_PROVIDER: local
+      LLM_PROVIDER: disabled
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+    services:
+      postgres:
+        image: postgres:18.4-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: narxpilot_ci_ephemeral
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Получить точную ревизию с lockfile
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.lockfile.outputs.revision }}
+          persist-credentials: false
+      - name: Node.js 22.22.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.22.0'
+      - name: Python 3.12.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12.12'
+      - name: Установить закреплённые npm-зависимости
+        id: node_deps
+        run: npm ci --no-audit --no-fund
+      - name: Установить закреплённые Python-зависимости
+        id: python_deps
+        if: ${{ !cancelled() }}
+        run: python -m pip install --disable-pip-version-check -r worker/requirements.lock
+      - name: Создать отдельные тестовые базы
+        id: databases
+        if: ${{ !cancelled() && steps.python_deps.outcome == 'success' }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio
+          import asyncpg
+
+          async def prepare():
+              connection = await asyncpg.connect('postgresql://postgres:narxpilot_ci_ephemeral@127.0.0.1:5432/postgres')
+              try:
+                  for name in ('narxpilot_test_web', 'narxpilot_test_worker'):
+                      await connection.execute(f'CREATE DATABASE {name}')
+              finally:
+                  await connection.close()
+
+          asyncio.run(prepare())
+          PY
+      - name: ESLint
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: npm run lint
+      - name: TypeScript
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: npm run typecheck
+      - name: Node unit-тесты
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: npm run test:unit
+      - name: Node/PostgreSQL integration-тесты
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' && steps.databases.outcome == 'success' }}
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:narxpilot_ci_ephemeral@127.0.0.1:5432/narxpilot_test_web
+        run: npm run test:integration
+      - name: Python/PostgreSQL-тесты
+        if: ${{ !cancelled() && steps.python_deps.outcome == 'success' && steps.databases.outcome == 'success' }}
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:narxpilot_ci_ephemeral@127.0.0.1:5432/narxpilot_test_worker
+        run: python -m pytest worker/tests -q
+      - name: Сборка Next.js
+        id: web_build
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: npm run build
+      - name: Проверить локальный Compose без вывода секретов
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: |
+          npm run setup:env
+          docker compose --file docker-compose.yml config --quiet
+      - name: Собрать web-образ для сервера
+        if: ${{ !cancelled() && steps.web_build.outcome == 'success' }}
+        run: docker build --tag narxpilot-web:ci .
+      - name: Собрать worker-образ для сервера
+        if: ${{ !cancelled() && steps.python_deps.outcome == 'success' }}
+        run: docker build --file worker/Dockerfile --tag narxpilot-worker:ci .
+
