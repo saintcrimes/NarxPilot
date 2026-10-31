@@ -11,7 +11,9 @@ test('Язык и светлая тема сохраняются после пе
   const catalogLanguage=page.getByRole('combobox',{name:'Язык / Language'});
   await catalogLanguage.selectOption('en');await expect(page.locator('html')).toHaveAttribute('lang','en');
   await expect(page.getByLabel('Search exact products')).toBeVisible();
+  await expect.poll(()=>page.locator('.product-card img').first().evaluate(image=>(image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await catalogLanguage.selectOption('uz');await expect(page.locator('html')).toHaveAttribute('lang','uz');
   await expect(page.getByLabel('Aniq mahsulotni qidirish')).toBeVisible();
+  await expect.poll(()=>page.locator('.product-card img').first().evaluate(image=>(image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await catalogLanguage.selectOption('ru');await expect(page.getByLabel('Поиск точного товара')).toBeVisible();
 });
