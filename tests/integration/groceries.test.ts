@@ -22,6 +22,8 @@ after(async()=>{await pool().end();});
 test('Продуктовый каталог показывает точные упаковки и скрывает архивную электронику без удаления',async()=>{
   const visible=await products();assert.equal(visible.length,10);assert.ok(visible.every(item=>item.code.startsWith('GR-')&&item.catalog_visible&&item.condition==='packaged'));
   const flour=await products('GR-001');assert.equal(flour[0].model,'Мука пшеничная высший сорт');assert.equal(flour[0].variant,'2 кг');assert.equal(flour[0].unit,'уп.');
+  for(const search of ['Makfa 2 кг','Makfa2kg','flour2kg','bugdoyuni2kg','GR001'])assert.deepEqual((await products(search)).map(item=>item.code),['GR-001'],search);
+  assert.equal((await products('Makfa 1 kg')).length,0);
   assert.equal((await products('iPhone')).length,0);
   const old=(await query('SELECT code,catalog_visible FROM skus WHERE id=$1',[demoId('sku0')]))[0];assert.equal(old.code,'NP-001');assert.equal(old.catalog_visible,false);
   assert.ok((await query("SELECT count(*)::integer n FROM business_events WHERE source_id='seed-v1'"))[0].n>0);

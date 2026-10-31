@@ -3,6 +3,7 @@ import { Decimal, total } from '../domain/money';
 import { requireThat } from '../domain/errors';
 import type { Snapshot } from '../domain/types';
 import { origin } from './config';
+import { matchesProductSearch } from '../domain/product-search';
 export type Product = { id:string; code:string; brand:string; model:string; variant:string; condition:string; region:string; warranty:string; category:string; unit:string; catalog_visible:boolean };
 export type Offer = {
   id:string; supplier_id:string; supplier_name:string; sku_id:string; warehouse_id:string;
@@ -13,7 +14,9 @@ export type Offer = {
   total:string|null; eligible:boolean; expired:boolean; unit?:string;
 };
 export async function products(search='') {
-  return query<Product>(`SELECT * FROM skus WHERE catalog_visible AND concat_ws(' ',code,category,brand,model,variant,condition,region,warranty,unit) ILIKE $1 ORDER BY code LIMIT 100`,['%'+search+'%']);
+  // Prototype cap: search the first 100 visible SKUs, including their EN/UZ labels.
+  const rows = await query<Product>(`SELECT * FROM skus WHERE catalog_visible ORDER BY code LIMIT 100`);
+  return rows.filter(product => matchesProductSearch(product, search));
 }
 export async function offers(skuId:string, quantity:number, location='all', db:Db=pool(), includeStale=false) {
   await assertDatabaseIdentity(db);
