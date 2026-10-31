@@ -172,7 +172,10 @@ const root=process.argv[2]+'/.local/',read=name=>readFileSync(root+name,'utf8');
 if(read('counts-first.json')!==read('counts-second.json'))throw new Error('Repeat deployment changed seed/event counts');
 const dumps=readdirSync(root+'backups').filter(name=>name.endsWith('.dump'));
 if(dumps.length!==1||statSync(root+'backups/'+dumps[0]).size===0||readFileSync(root+'backups/'+dumps[0]).subarray(0,5).toString()!=='PGDMP')throw new Error('Repeat deployment must create one real PostgreSQL custom dump');
-const log=read('deploy-second.log'),backup=log.indexOf('[backup-db]'),migration=log.indexOf('[migrate]');
+// BuildKit also prints labels such as "#12 [migrate] exporting to image".
+// Match only control.sh stage headers, after removing terminal color/control codes.
+const log=read('deploy-second.log').replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
+const backup=log.search(/^\[backup-db\] /m),migration=log.search(/^\[migrate\] /m);
 if(backup<0||migration<backup)throw new Error('Backup must precede migration on repeat deploy');
 JS
 "${CURL[@]}" --fail --config "$fixture/.local/deploy/curl-auth.conf" https://narxpilot.localhost/api/health/ready >/dev/null
