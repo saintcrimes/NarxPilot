@@ -17,6 +17,8 @@ try {
   await pool.query(`GRANT SELECT ON ALL TABLES IN SCHEMA public TO narxpilot_web;
     GRANT INSERT,UPDATE ON orders,reservations,inventory_balances,returns,offers,alert_rules,notifications,rate_limits TO narxpilot_web;
     GRANT INSERT ON offer_versions,shipments,receipts,business_events,outbox,idempotency,audit_log TO narxpilot_web;
+    GRANT INSERT ON users,organizations,memberships,warehouses,auth_credentials TO narxpilot_web;
+    REVOKE ALL ON auth_credentials FROM narxpilot_worker;
     GRANT SELECT ON database_identity,skus,warehouses,business_events,analytics_snapshots,outbox TO narxpilot_worker;
     GRANT INSERT,UPDATE ON analytics_snapshots,forecast_runs TO narxpilot_worker;
     GRANT UPDATE ON outbox TO narxpilot_worker;

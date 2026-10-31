@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { randomBytes } from 'node:crypto';
-import { actor,session,demoProfiles,loginDemo } from '@/server/auth';
+import { randomBytes,createHmac } from 'node:crypto';
+import { actor,session,demoProfiles,loginDemo,sessionProfile,register,login } from '@/server/auth';
+import { registrationSchema,loginSchema } from '@/server/credentials';
 import { isDemo,origin } from '@/server/config';
 import { chatbotEnabled } from '@/domain/flags';
 import { requireThat } from '@/domain/errors';
@@ -26,13 +27,13 @@ export async function GET(request:NextRequest,context:Context) {
       const identity=(await query('SELECT data_origin FROM database_identity WHERE singleton'))[0];
       requireThat(identity?.data_origin===origin(),'DATABASE_MODE_MISMATCH','Неверная база',503);
       const migrations=(await query('SELECT count(*)::integer n FROM schema_migrations'))[0].n;
-      requireThat(migrations>=3,'MIGRATIONS_PENDING','Требуются миграции',503);
+      requireThat(migrations>=4,'MIGRATIONS_PENDING','Требуются миграции',503);
       return {status:'ready',data_origin:identity.data_origin};
     }
     if(route==='session') {
       const s=await session(); if(!s.csrf){s.csrf=randomBytes(24).toString('hex');await s.save();}
       const profiles=isDemo()?await demoProfiles():[];
-      const profile=s.userId?profiles.find(p=>p.user_id===s.userId&&p.organization_id===s.organizationId)??null:null;
+      const profile=await sessionProfile();
       const help=chatbotState();
       return {csrf:s.csrf,demo:isDemo(),chatbot_enabled:chatbotEnabled(process.env.CHATBOT_ENABLED),chatbot_provider:help.provider,chatbot_available:help.available&&Boolean(profile),profiles,profile};
     }
@@ -59,6 +60,15 @@ export async function POST(request:NextRequest,context:Context) {
     await protectMutation(request); const {path:p}=await context.params;const route=p.join('/');
     const body=await bodyOf(request);const key=request.headers.get('idempotency-key')??'';
     if(route==='session/demo') {await rateLimit('demo-login',120);return loginDemo(z.object({userId:uuid}).strict().parse(body).userId);}
+    if(route==='auth/register'||route==='auth/login'){
+      const b=route==='auth/register'?registrationSchema.parse(body):loginSchema.parse(body);
+      const s=await session();
+      const fingerprint=(value:string)=>createHmac('sha256',process.env.SESSION_SECRET??'').update(value).digest('hex');
+      await rateLimit('auth:email:'+fingerprint(b.email),10);
+      await rateLimit('auth:session:'+fingerprint(s.csrf??''),20);
+      await rateLimit('auth:ip:'+fingerprint(request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()??'direct'),60);
+      return route==='auth/register'?register(b):login(b);
+    }
     const a=await actor();await rateLimit('mutation:'+a.organizationId,180);
     if(route==='session/logout') {(await session()).destroy();return {ok:true};}
     if(route==='help/chat') {
