@@ -211,6 +211,9 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Показать текст браузерной ошибки
+        if: ${{ failure() && steps.e2e.outcome == 'failure' }}
+        run: find test-results -name error-context.md -type f -print -exec cat {} \;
       - name: Диагностика контейнеров при ошибке
         if: ${{ failure() && steps.local_config.outcome == 'success' }}
         run: docker compose --file docker-compose.yml logs --no-color --tail=100

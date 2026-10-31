@@ -1,9 +1,31 @@
-import { test,expect } from '@playwright/test';
-test('Поиск → сравнение → котировка → резерв → отгрузка → приёмка → аналитика',async({page})=>{
+import { test,expect,type Page } from '@playwright/test';
+
+async function openCatalog(page:Page) {
+  // Observe the browser's session request. A second parallel GET would create
+  // another anonymous cookie and invalidate the CSRF token rendered by the UI.
+  const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/session'&&r.request().method()==='GET');
   await page.goto('/catalog');
-  const meta=await (await page.request.get('/api/session')).json();
+  const session=await response;
+  expect(session.ok()).toBeTruthy();
+  return session.json();
+}
+
+async function switchProfile(page:Page,userId:string) {
+  const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/session/demo'&&r.request().method()==='POST');
+  const refreshed=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/session'&&r.request().method()==='GET');
+  await page.getByLabel('Демонстрационный аккаунт').selectOption(userId);
+  const changed=await response;
+  const result=await changed.json();
+  expect(changed.ok(),result.error?.message??'Смена аккаунта должна завершиться успешно').toBeTruthy();
+  const session=await (await refreshed).json();
+  expect(session.profile?.user_id).toBe(userId);
+  await expect(page.getByLabel('Демонстрационный аккаунт')).toHaveValue(userId);
+}
+
+test('Поиск → сравнение → котировка → резерв → отгрузка → приёмка → аналитика',async({page})=>{
+  const meta=await openCatalog(page);
   const buyer=meta.profiles.find((p:{name:string})=>p.name.includes('Орион'));
-  await page.getByLabel('Демонстрационный аккаунт').selectOption(buyer.user_id);
+  await switchProfile(page,buyer.user_id);
   await page.getByLabel('Поиск точного товара').fill('iPhone 15 128');
   await expect(page.locator('.product-card')).toHaveCount(1);
   await page.getByRole('link',{name:'Сравнить',exact:true}).click();
@@ -13,15 +35,16 @@ test('Поиск → сравнение → котировка → резерв 
   const id=new URL(page.url()).pathname.split('/')[2];
   const o=await (await page.request.get('/api/orders/'+id)).json();
   const seller=meta.profiles.find((p:{organization_id:string})=>p.organization_id===o.supplier_id);
-  await page.getByLabel('Демонстрационный аккаунт').selectOption(seller.user_id);
+  await switchProfile(page,seller.user_id);
   await page.getByRole('button',{name:'Подтвердить условия',exact:true}).click();
   await expect(page.locator('.status')).toHaveText('Условия подтверждены');
-  await page.getByLabel('Демонстрационный аккаунт').selectOption(buyer.user_id);
+  await switchProfile(page,buyer.user_id);
   await page.getByRole('button',{name:'Согласен с условиями · зарезервировать'}).click();
   await expect(page.locator('.status')).toHaveText('Товар в резерве');
-  await page.getByLabel('Демонстрационный аккаунт').selectOption(seller.user_id);
+  await switchProfile(page,seller.user_id);
   await page.getByRole('button',{name:'Подтвердить отгрузку',exact:true}).click();
-  await page.getByLabel('Демонстрационный аккаунт').selectOption(buyer.user_id);
+  await expect(page.locator('.status')).toHaveText('Отгружен');
+  await switchProfile(page,buyer.user_id);
   await page.getByRole('button',{name:'Подтвердить приёмку',exact:true}).click();
   await expect(page.locator('.status')).toHaveText('Приёмка подтверждена');
   await page.reload();await expect(page.locator('.status')).toHaveText('Приёмка подтверждена');
@@ -29,7 +52,7 @@ test('Поиск → сравнение → котировка → резерв 
   await page.getByRole('link',{name:'Посмотреть аналитику'}).click();await expect(page.locator('.series-chart')).toBeVisible();
 });
 test('Флаг справки, локальные кнопки и очистка переписки после обновления',async({page})=>{
-  await page.goto('/catalog');const meta=await (await page.request.get('/api/session')).json();
+  const meta=await openCatalog(page);
   if(!meta.chatbot_enabled){await expect(page.getByRole('button',{name:'Помощь',exact:true})).toHaveCount(0);return;}
   await page.getByRole('button',{name:'Помощь',exact:true}).click();
   const requests:string[]=[];page.on('request',r=>requests.push(r.url()));
