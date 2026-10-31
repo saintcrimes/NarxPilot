@@ -1,0 +1,9 @@
+# Компоненты интерфейса
+
+Проект уже использует Next.js, React и TypeScript. Алиас `@/*` в `tsconfig.json` указывает на `src/*`; поэтому общие компоненты находятся в `src/components/ui`, импортируются как `@/components/ui/chart-line`. Создавать второй корневой каталог `components/ui` не нужно: он не соответствовал бы существующему алиасу. `components.json` явно задаёт этот путь для shadcn CLI и путь стилей `app/globals.css`.
+
+Tailwind CSS 4 подключён через `@tailwindcss/postcss` и `postcss.config.mjs`. Импортированы theme/utilities без глобального preflight, чтобы сохранить существующие стили рабочих экранов. Вспомогательная `cn` находится в `src/lib/utils.ts`. Установка закреплённых зависимостей: `npm ci`; проверки: `npm run lint`, `npm run typecheck`, `npm run build`. Повторный `shadcn init` не требуется: ручная настройка уже сохранена. Последующие компоненты добавляются `npx shadcn@<проверенная-версия> add <компонент>` с просмотром предлагаемых изменений.
+
+ChartLine использует `motion/react`, ResizeObserver, подсказки, клавиатурную навигацию и переключение рядов. Исходный пример адаптирован к данным NarxPilot: `null` даёт разрыв, денежные строки сохраняются, вычисления денег выполняются Decimal, числовые координаты используются только для SVG. Цены и продажи остаются отдельными рядами; автопроцент на графике рынка отключён. Демо-массив Revenue из примера не подставляется в аналитику: данные поступают из сохранённых агрегатов событий PostgreSQL. Линии цен соединяются линейно, чтобы сглаживание не создавало промежуточных цен вне наблюдений.
+
+Официальные руководства: [Motion](https://motion.dev/docs/react-installation), [Tailwind + Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs), [ручная настройка shadcn](https://ui.shadcn.com/docs/installation/manual).

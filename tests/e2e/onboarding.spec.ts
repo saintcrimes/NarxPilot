@@ -56,7 +56,7 @@ test('Регистрация → сохранённый профиль → вы�
   await expectNoHorizontalOverflow(page);
   await page.getByLabel('Ваше имя',{exact:true}).fill(name);
   await page.getByLabel('Организация',{exact:true}).fill('E2E '+testInfo.project.name);
-  await page.getByLabel('Я планирую',{exact:true}).selectOption('buyer');
+  await page.getByRole('combobox',{name:'Я планирую',exact:true}).selectOption('buyer');
   await page.getByLabel('Email',{exact:true}).fill(email);
   await page.getByLabel('Пароль',{exact:true}).fill(password);
   const registered=await mutateThroughUi(page,'auth/register',()=>page.getByRole('button',{name:'Создать аккаунт',exact:true}).click());

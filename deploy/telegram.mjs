@@ -14,15 +14,19 @@ export async function loadTelegramEnv(root=process.cwd(),environment=process.env
   let file={};try{file=parseEnv(await readFile(resolve(root,'.env'),'utf8'));}catch(error){if(error.code!=='ENOENT')throw new Error('Не удалось прочитать серверный .env.');}
   return {...file,...environment};
 }
-export async function telegramCall(token,method,body={},fetchImpl=fetch,timeoutMs=10000){
-  if(!['getMe','setChatMenuButton','getChatMenuButton'].includes(method))throw new Error('Недопустимый метод настройки Telegram.');
+export class TelegramApiError extends Error {
+  constructor(code,message){super(message);this.code=code;}
+}
+export async function telegramCall(token,method,body={},fetchImpl=fetch,timeoutMs=10000,signal){
+  if(!['getMe','setChatMenuButton','getChatMenuButton','getWebhookInfo','getUpdates','sendMessage'].includes(method))throw new Error('Недопустимый метод настройки Telegram.');
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{
-    const response=await fetchImpl(`https://api.telegram.org/bot${token}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:controller.signal,redirect:'error'});
-    if(!response.ok)throw new Error('HTTP');
-    const payload=await response.json();if(payload?.ok!==true)throw new Error('API');
+    const response=await fetchImpl(`https://api.telegram.org/bot${token}/${method}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:signal?AbortSignal.any([controller.signal,signal]):controller.signal,redirect:'error'});
+    const payload=await response.json();
+    if(!response.ok||payload?.ok!==true)throw new TelegramApiError(Number.isInteger(payload?.error_code)?payload.error_code:response.status,'Ошибка Telegram API. Проверьте токен и соединение; секреты не выводятся.');
     return payload.result;
-  }catch{
+  }catch(error){
+    if(error instanceof TelegramApiError)throw error;
     // Fetch errors and Telegram descriptions may contain the token-bearing URL.
     throw new Error(controller.signal.aborted?'Telegram не ответил вовремя. Повторите команду.':'Ошибка Telegram API. Проверьте токен и соединение; секреты не выводятся.');
   }finally{clearTimeout(timer);}

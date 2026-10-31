@@ -17,6 +17,27 @@ x-common: &common
   NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-in_app}
 
 services:
+  telegram-bot:
+    image: narxpilot-web:local
+    profiles: [tools]
+    environment:
+      DEMO_MODE: ${DEMO_MODE:-true}
+      TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+      TELEGRAM_MINI_APP_URL: ${TELEGRAM_MINI_APP_URL:-https://narxpilot.software-engineer.online/}
+    command: ["node", "deploy/telegram-bot.mjs"]
+    healthcheck:
+      test: ["CMD", "node", "deploy/telegram-bot.mjs", "--health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=1m,mode=1777"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    init: true
+    restart: unless-stopped
+    logging: *logging
   telegram:
     image: narxpilot-web:local
     profiles: [tools]

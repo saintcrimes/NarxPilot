@@ -32,13 +32,11 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.22.0'
-      - name: Создать настоящий lockfile, если он отсутствует
+      - name: Согласовать lockfile с закреплёнными зависимостями
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f package-lock.json ]]; then
-            npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          fi
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           # В job с правом записи запрещены lifecycle-скрипты зависимостей.
           npm ci --ignore-scripts --no-audit --no-fund
       - name: Сохранить lockfile как отдельный артефакт
@@ -48,13 +46,15 @@ jobs:
           path: package-lock.json
           if-no-files-found: error
           retention-days: 7
-      - name: Зафиксировать только новый lockfile без перезаписи истории
+      - name: Сохранить фотографии моделей из проверенных источников
+        run: node scripts/fetch-product-images.mjs
+      - name: Зафиксировать lockfile и фотографии без перезаписи истории
         id: revision
         shell: bash
         run: |
           set -euo pipefail
-          git add -- package-lock.json
-          if ! git diff --cached --quiet -- package-lock.json; then
+          git add -- package-lock.json public/products/
+          if ! git diff --cached --quiet -- package-lock.json public/products/; then
             git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
             if [[ "$(git rev-parse HEAD)" != "$(git rev-parse refs/remotes/origin/main)" ]]; then
               echo 'Ветка main уже изменилась. Lockfile сохранён в артефакте; повторите проверку нового коммита.' >&2
@@ -62,7 +62,7 @@ jobs:
             fi
             git -c user.name='github-actions[bot]' \
                 -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-                commit -m 'chore: lock verified npm dependency resolution' -- package-lock.json
+                commit -m 'chore: lock dependencies and store verified product photos' -- package-lock.json public/products/
             git push origin HEAD:refs/heads/main
           fi
           printf 'sha=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"

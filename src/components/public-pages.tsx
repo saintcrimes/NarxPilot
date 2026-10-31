@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import type { FormEvent } from 'react';
+import { useEffect,useRef,type FormEvent } from 'react';
 import { Icon, Notice } from './ui';
 
 export function Brand({ compact = false }: { compact?: boolean }) {
@@ -18,7 +18,17 @@ export function PublicMode({ demo }: { demo: boolean }) {
   return demo ? <div className="public-demo-note"><span>DEMO_MODE</span> Вы в демоверсии: товары, поставщики и сделки синтетические.</div> : null;
 }
 export function Landing(props: PublicProps) {
-  return <div className="public-site"><PublicHeader signedIn={props.signedIn}/><PublicMode demo={props.demo}/><main className="landing-main">
+  const main=useRef<HTMLElement>(null);
+  useEffect(()=>{
+    if(!main.current||window.matchMedia('(prefers-reduced-motion: reduce)').matches||!('IntersectionObserver' in window))return;
+    const sections=main.current.querySelectorAll('.landing-features,.landing-section,.business-section,.landing-final');
+    const observer=new IntersectionObserver(entries=>{
+      for(const entry of entries)if(entry.isIntersecting){entry.target.setAttribute('data-motion-visible','true');observer.unobserve(entry.target);}
+    },{threshold:0.08,rootMargin:'0px 0px -28px 0px'});
+    for(const section of sections){section.setAttribute('data-motion-reveal','');observer.observe(section);}
+    return ()=>observer.disconnect();
+  },[]);
+  return <div className="public-site"><PublicHeader signedIn={props.signedIn}/><PublicMode demo={props.demo}/><main className="landing-main" ref={main}>
     <section className="landing-hero"><div className="landing-copy"><div className="landing-kicker"><span className="violet-dot"/> B2B-закупки · Узбекистан</div><h1>Уверенность<br/>в каждой <span>закупке.</span></h1><p className="landing-lead">Находите точный товар, сравнивайте стоимость с доставкой и ведите закупку до приёмки. Решения — на основе наблюдаемых цен и подтверждённых сделок.</p><div className="landing-actions">{props.demo ? <><button className="button primary large" disabled={!props.ready || props.busy} onClick={() => void props.onDemo('/catalog')}>{props.busy ? 'Открываем кабинет…' : 'Попробовать демо'}<Icon name="arrow"/></button><button className="button glass large" disabled={!props.ready || props.busy} onClick={() => void props.onDemo('/analytics')}><Icon name="chart"/>Посмотреть аналитику</button></> : <Link className="button primary large" href={props.signedIn ? '/catalog' : '/register'}>{props.signedIn ? 'Открыть каталог' : 'Создать аккаунт'}<Icon name="arrow"/></Link>}</div><p className="landing-caption">{props.demo ? 'Готовый аккаунт покупателя. Один клик — и вы внутри.' : 'Единое рабочее пространство покупателя и поставщика.'}</p>{props.error && <Notice error>{props.error}</Notice>}<div className="landing-trust"><span><Icon name="check" size={15}/> Полная стоимость</span><span><Icon name="check" size={15}/> История событий</span><span><Icon name="check" size={15}/> Проверяемые данные</span></div></div>
       <div className="hero-orbit" aria-label="От точного товара к подтверждённой сделке"><div className="orbit-ring ring-one"/><div className="orbit-ring ring-two"/><div className="orbit-glow"/><Image className="hero-brand-icon" src="/brand/icon.png" width={250} height={250} alt="Логотип NarxPilot" priority/><div className="orbit-card orbit-top"><span className="orbit-icon"><Icon name="search"/></span><div><small>01 / НАЙДИТЕ</small><strong>Точный товар</strong><span>Модель · память · регион</span></div><span className="orbit-check"><Icon name="check" size={14}/></span></div><div className="orbit-card orbit-right"><span className="orbit-icon"><Icon name="compare"/></span><div><small>02 / СРАВНИТЕ</small><strong>Полную стоимость</strong><span>Товар + доставка + сборы</span></div></div><div className="orbit-card orbit-bottom"><span className="orbit-icon"><Icon name="shield"/></span><div><small>03 / ПОДТВЕРДИТЕ</small><strong>Каждый этап сделки</strong><span>От заявки до приёмки</span></div><span className="orbit-check"><Icon name="check" size={14}/></span></div><span className="orbit-caption">Один понятный путь закупки</span></div>
     </section>

@@ -1,0 +1,11 @@
+[
+  {"model":"iPhone 15","file":"iphone-15.png","url":"https://cdsassets.apple.com/live/7WUAS350/images/tech-specs/iphone_15_hero.png","source":"https://support.apple.com/en-gb/111831"},
+  {"model":"iPhone 16","file":"iphone-16.png","url":"https://cdsassets.apple.com/live/7WUAS350/images/tech-specs/iphone-16.png","source":"https://support.apple.com/en-us/121029"},
+  {"model":"Galaxy S24","file":"galaxy-s24.jpg","url":"https://samsungbrshop.vtexassets.com/arquivos/ids/249008-800-auto?v=638793874886700000","source":"https://shop.samsung.com/br/galaxy-s24/p"},
+  {"model":"Galaxy A55","file":"galaxy-a55.jpg","url":"https://samsungbrshop.vtexassets.com/arquivos/ids/229995-800-auto?v=638448298955530000","source":"https://shop.samsung.com/br/galaxy-a55/p"},
+  {"model":"Galaxy S23","file":"galaxy-s23.png","url":"https://shop.samsung.com/latin/cac/pub/media/catalog/product/0/0/00-diamot-sm-s911_galaxys23_all-name_thumb_3.png","source":"https://shop.samsung.com/latin/cac/cr/galaxy-s23-256gb.html"},
+  {"model":"Redmi Note 13","file":"redmi-note-13.png","url":"https://i02.appmifile.com/mi-com-product/fly-birds/redmi-note-13/PC/1459c3984bb19f5d07535f33419950b7.png","source":"https://www.mi.com/global/product/redmi-note-13/"},
+  {"model":"14T","file":"xiaomi-14t.png","url":"https://i02.appmifile.com/133_item_kr/23/03/2025/731b69da8b7d181b9b60b93c955f3490.png","source":"https://www.mi.com/kr/product/xiaomi-14t/buy/"},
+  {"model":"200","file":"honor-200.png","url":"https://www.honor.com/content/dam/honor/uk/product-list/smartphone/honor-200/honor-200-white-list.png","source":"https://www.honor.com/uk/phones/honor-200/buy/"},
+  {"model":"12 Pro","file":"realme-12-pro.png","url":"https://mtscdn.ru/upload/iblock/cee/12_pro_white.png","source":"https://shop.mts.ru/product/smartfon-realme-12-pro-5g-8-128-gb-bezhevyj"}
+]
