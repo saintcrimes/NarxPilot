@@ -71,7 +71,7 @@ jobs:
     name: Тесты, типы и сборка
     needs: lockfile
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     permissions:
       contents: read
     env:
@@ -119,6 +119,17 @@ jobs:
         id: python_deps
         if: ${{ !cancelled() }}
         run: python -m pip install --disable-pip-version-check -r worker/requirements.lock
+      - name: Проверить настройки развёртывания и Caddy
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        env:
+          RUN_DOCKER_TESTS: 'true'
+        run: node --test deploy/tests/*.test.mjs
+      - name: Проверить аргументы установщика без изменения сервера
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: bash deploy/tests/test-install.sh
+      - name: Проверить порядок развёртывания и резервного копирования с mock CLI
+        if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
+        run: bash deploy/tests/test-control.sh
       - name: Создать отдельные тестовые базы
         id: databases
         if: ${{ !cancelled() && steps.python_deps.outcome == 'success' }}
@@ -162,14 +173,47 @@ jobs:
         if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
         run: npm run build
       - name: Проверить локальный Compose без вывода секретов
+        id: local_config
         if: ${{ !cancelled() && steps.node_deps.outcome == 'success' }}
         run: |
           npm run setup:env
           docker compose --file docker-compose.yml config --quiet
       - name: Собрать web-образ для сервера
+        id: web_image
         if: ${{ !cancelled() && steps.web_build.outcome == 'success' }}
         run: docker build --tag narxpilot-web:ci .
       - name: Собрать worker-образ для сервера
+        id: worker_image
         if: ${{ !cancelled() && steps.python_deps.outcome == 'success' }}
         run: docker build --file worker/Dockerfile --tag narxpilot-worker:ci .
-
+      - name: Запустить изолированную демобазу, web и worker
+        id: demo_stack
+        if: ${{ !cancelled() && steps.local_config.outcome == 'success' && steps.web_image.outcome == 'success' && steps.worker_image.outcome == 'success' }}
+        run: docker compose --file docker-compose.yml up --build -d --wait --wait-timeout 240
+      - name: Установить Chromium для браузерной проверки
+        id: browser
+        if: ${{ !cancelled() && steps.demo_stack.outcome == 'success' }}
+        run: npx playwright install --with-deps chromium
+      - name: Пройти закупку и справку на desktop/mobile
+        id: e2e
+        if: ${{ !cancelled() && steps.demo_stack.outcome == 'success' && steps.browser.outcome == 'success' }}
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npm run test:e2e -- --reporter=line,html
+      - name: Сохранить браузерную диагностику при ошибке
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Диагностика контейнеров при ошибке
+        if: ${{ failure() && steps.local_config.outcome == 'success' }}
+        run: docker compose --file docker-compose.yml logs --no-color --tail=100
+      - name: Остановить только изолированный стек CI
+        if: ${{ always() && steps.local_config.outcome == 'success' }}
+        run: docker compose --file docker-compose.yml down --remove-orphans

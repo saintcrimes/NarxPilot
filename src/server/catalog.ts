@@ -10,14 +10,14 @@ export type Offer = {
   min_quantity:number; delivery_days:number; available:number|null; location_id:string;
   location_name:string; warranty:string; valid_until:Date; last_verified_at:Date;
   currency:'UZS'; payment_terms:'bank_transfer'; price_basis:'seller_final';
-  total:string|null; eligible:boolean;
+  total:string|null; eligible:boolean; expired:boolean;
 };
 export async function products(search='') {
   return query<Product>(`SELECT * FROM skus WHERE concat_ws(' ',code,brand,model,variant,condition,region,warranty) ILIKE $1 ORDER BY code LIMIT 100`,['%'+search+'%']);
 }
 export async function offers(skuId:string, quantity:number, location='all', db:Db=pool(), includeStale=false) {
   await assertDatabaseIdentity(db);
-  const rows = (await db.query(`SELECT o.*,v.*,o.id,s.name supplier_name,k.warranty,
+  const rows = (await db.query(`SELECT o.*,v.*,o.id,s.name supplier_name,k.warranty,v.valid_until<=now() AS expired,
     w.location_id,l.name location_name,
     CASE WHEN b.verified_at > now()-interval '24 hours' THEN b.on_hand-b.reserved ELSE NULL END available
     FROM offers o JOIN offer_versions v ON v.offer_id=o.id AND v.version=o.current_version
@@ -27,7 +27,7 @@ export async function offers(skuId:string, quantity:number, location='all', db:D
     WHERE o.sku_id=$1 AND o.active AND o.data_origin=$2
       AND ($3='all' OR w.location_id=$3) AND ($4 OR v.valid_until>now())`,[skuId,origin(),location,includeStale])).rows;
   return (rows as Offer[]).map(o=>({...o,total:total(o.unit_price,quantity,o.delivery,o.fees),
-    eligible:o.available !== null && o.available>=quantity && o.min_quantity<=quantity && new Date(o.valid_until).getTime()>Date.now()}))
+    eligible:o.available !== null && o.available>=quantity && o.min_quantity<=quantity && !o.expired}))
     .sort((a,b)=>a.total===null?1:b.total===null?-1:new Decimal(a.total).comparedTo(b.total));
 }
 export function snapshot(offer:Offer, quantity:number):Snapshot {

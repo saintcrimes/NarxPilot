@@ -9,6 +9,7 @@ import { notify } from '../../src/server/events';
 import { seedDemo,demoId } from '../../scripts/seed';
 import { previewCsv,importCsv } from '../../src/server/csv';
 import { explain } from '../../src/server/assistant';
+import { offers } from '../../src/server/catalog';
 import type { Actor } from '../../src/domain/types';
 process.env.DEMO_MODE='true';
 process.env.DATABASE_URL=process.env.TEST_DATABASE_URL;
@@ -95,4 +96,15 @@ test('A10: без ключа LLM используется честный шаб�
   process.env.LLM_PROVIDER='disabled';const result=await explain(buyer,skuId);assert.equal(result.provider,'template');assert.equal(result.is_ai,false);
   assert.equal(result.sku_id,skuId);assert.equal(result.cohort,'all|2-9');
   const filtered=await explain(buyer,skuId,'malika','10+');assert.equal(filtered.cohort,'malika|10+');assert.equal(filtered.is_ai,false);
+});
+test('A02: просроченное предложение помечено сервером и скрыто из актуального сравнения',async()=>{
+  const expiredId=randomUUID();
+  await transaction(async db=>{
+    await db.query("INSERT INTO offers(id,supplier_id,sku_id,warehouse_id,data_origin) VALUES($1,$2,$3,$4,'synthetic')",[expiredId,seller.organizationId,skuId,demoId('warehouse0')]);
+    await db.query("INSERT INTO offer_versions(offer_id,version,unit_price,delivery,last_verified_at,valid_until) VALUES($1,1,7900000,0,now()-interval '2 hours',now()-interval '1 hour')",[expiredId]);
+  });
+  assert.equal((await offers(skuId,5)).some(o=>o.id===expiredId),false);
+  const expired=(await offers(skuId,5,'all',undefined,true)).find(o=>o.id===expiredId);
+  assert.ok(expired);assert.equal(expired.expired,true);assert.equal(expired.eligible,false);
+  assert.equal((await offers(skuId,5)).find(o=>o.id===offerId)?.expired,false);
 });

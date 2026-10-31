@@ -8,6 +8,8 @@ node_modules
 .cache
 .venv
 __pycache__
+.pytest_cache
+*.log
 test-results
 playwright-report
 *.tsbuildinfo

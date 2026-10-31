@@ -1,0 +1,11 @@
+{$NARXPILOT_DOMAIN} {
+    encode zstd gzip
+    # В текущем прототипе есть переключение демоаккаунтов; доступ к стенду закрыт паролем.
+    basic_auth {
+        {$DEPLOY_BASIC_USER} {$DEPLOY_BASIC_HASH}
+    }
+    reverse_proxy web:3000 {
+        header_up -Authorization
+    }
+    header Strict-Transport-Security "max-age=31536000"
+}

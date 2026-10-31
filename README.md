@@ -2,7 +2,17 @@
 
 B2B-закупки точных SKU смартфонов в Ташкенте и аналитика зарегистрированных событий. Интерфейс на русском, деньги Decimal/NUMERIC в строках JSON, хранение времени UTC, отчётные дни Asia/Tashkent.
 
-**Статус:** продолжение исходного прототипа, не пересоздание. Реализованы серверная логика, шесть экранов, worker и тесты. Полный web-запуск и сборка ещё не подтверждены: в среде разработки заблокирован npm registry (`EACCES`), зависимости Next.js не установлены и `package-lock.json` не удалось получить. Docker daemon также недоступен. Фактические результаты — [docs/VERIFICATION.md](docs/VERIFICATION.md). Не считать этот статус production-готовностью.
+**Статус:** продолжение исходного прототипа, не пересоздание. Реализованы серверная логика, шесть экранов, worker и тесты. Настоящий package-lock.json получен и сохранён через GitHub CI; в Linux CI прошли типы, Next.js build, Node/PostgreSQL и Python/PostgreSQL тесты и обе Docker-сборки. Локальные npm/Docker ограничения сохраняются. Фактические результаты и оставшиеся проверки — [docs/VERIFICATION.md](docs/VERIFICATION.md). Не считать прототип готовым к реальным организациям без production-аутентификации.
+
+## Сервер и домен
+
+На Ubuntu/Debian-сервере после настройки DNS A-записи домена и открытия TCP 80/443:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/saintcrimes/NarxPilot/main/deploy/install.sh | sudo bash
+```
+
+Установщик клонирует проект в `/opt/narxpilot`, настраивает **narxpilot.software-engineer.online**, HTTPS, секреты, миграции, demo seed и healthchecks. Доступ к демо закрыт сгенерированным паролем из `.local/deploy/access.json`. Ваш локальный `.env` не попадает в GitHub: API-ключ задаётся отдельно на сервере. [Полная инструкция, обновление и backup](docs/DEPLOYMENT.md).
 
 ## Что есть в коде
 
@@ -19,19 +29,19 @@ B2B-закупки точных SKU смартфонов в Ташкенте и 
 
 Next.js 16.2.1 / React 19.2.4 / TypeScript 5.9.3; PostgreSQL 18; существующий node-postgres слой и SQL-миграции; Python 3.12 / asyncpg 0.32.0. SVG-графики получают только сохранённые агрегаты, без браузерной генерации истории. [Решения и допущения](docs/DECISIONS.md).
 
-Прямые npm-версии зафиксированы в package.json. **До создания настоящего lockfile сборка Docker с `npm ci` будет блокироваться.** Не добавлен выдуманный lockfile. Python-зависимости полностью перечислены с точными версиями в `worker/requirements.lock`; установленная закреплённая среда контейнера ещё не проверена.
+Прямые npm-версии зафиксированы в package.json, дерево зависимостей — в настоящем package-lock.json, созданном npm в GitHub CI. Docker использует `npm ci`. Python-зависимости перечислены с точными версиями в `worker/requirements.lock`. Обе закреплённые контейнерные сборки прошли в CI.
 
-## Запуск после восстановления доступа к registry
+## Локальный запуск с Docker
 
 Нужны Node.js 22.12+ (до 25), npm и работающий Docker Compose. Внешние AI-ключи не нужны.
 
 ```sh
-npm install
+npm ci
 npm run setup:env
 docker compose up --build -d
 ```
 
-Первая команда создаёт `package-lock.json`; сохраните его в Git и далее используйте `npm ci`. `setup:env` генерирует локальные секреты и никогда не перезаписывает существующий `.env`. Compose запускает PostgreSQL, миграции, отдельные роли web/worker, идемпотентный seed при DEMO_MODE, web и worker. Web доступен по `http://localhost:3000`; PostgreSQL наружу не публикуется.
+`npm ci` использует сохранённый lockfile. `setup:env` генерирует локальные секреты и никогда не перезаписывает существующий `.env`. Compose запускает PostgreSQL, миграции, отдельные роли web/worker, идемпотентный seed при DEMO_MODE, web и worker. Web доступен по `http://localhost:3000`; PostgreSQL наружу не публикуется.
 
 Для диагностики:
 

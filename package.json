@@ -17,6 +17,7 @@
     "test:unit": "tsx --test tests/unit/*.test.ts",
     "test:integration": "tsx --test --test-concurrency=1 tests/integration/*.test.ts",
     "test:e2e": "playwright test",
+    "test:deploy": "node --test deploy/tests/*.test.mjs",
     "setup:env": "node scripts/setup-env.mjs"
   },
   "dependencies": {

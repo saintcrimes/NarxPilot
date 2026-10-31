@@ -1,0 +1,120 @@
+name: narxpilot-server
+
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
+x-common: &common
+  DEMO_MODE: ${DEMO_MODE:?Run deploy/install.sh}
+  DEMO_ANCHOR_DATE: ${DEMO_ANCHOR_DATE:-2026-10-31}
+  TZ: UTC
+  APP_TIMEZONE: Asia/Tashkent
+  MIN_MARKET_SELLERS: ${MIN_MARKET_SELLERS:-5}
+  MIN_MARKET_ORDERS_PER_WINDOW: ${MIN_MARKET_ORDERS_PER_WINDOW:-20}
+  MIN_OBSERVED_DAYS_PER_WINDOW: ${MIN_OBSERVED_DAYS_PER_WINDOW:-5}
+  MAX_SELLER_VOLUME_SHARE: ${MAX_SELLER_VOLUME_SHARE:-0.60}
+  PRICE_TREND_THRESHOLD_PCT: ${PRICE_TREND_THRESHOLD_PCT:-2}
+  NOTIFICATION_CHANNEL: ${NOTIFICATION_CHANNEL:-in_app}
+
+services:
+  db:
+    image: postgres:18.4-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Database name required}
+      POSTGRES_USER: ${POSTGRES_USER:?Database owner required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+      TZ: UTC
+    volumes: ["database:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+    restart: unless-stopped
+  migrate:
+    image: narxpilot-web:local
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      <<: *common
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      WEB_DB_PASSWORD: ${WEB_DB_PASSWORD:?Web role password required}
+      WORKER_DB_PASSWORD: ${WORKER_DB_PASSWORD:?Worker role password required}
+    command: ["sh", "-c", "npm run db:migrate && npm run db:grants && if [ \"$$DEMO_MODE\" = true ]; then npm run db:seed:demo; fi"]
+    logging: *logging
+  web:
+    image: narxpilot-web:local
+    build: {context: ., dockerfile: Dockerfile}
+    environment:
+      <<: *common
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      APP_ORIGIN: https://${NARXPILOT_DOMAIN:?Domain required}
+      DATABASE_URL: postgresql://narxpilot_web:${WEB_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      SESSION_SECRET: ${SESSION_SECRET:?Session secret required}
+      RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES:-15}
+      OFFER_DEFAULT_TTL_HOURS: ${OFFER_DEFAULT_TTL_HOURS:-24}
+      ANALYTICS_MODE: ${ANALYTICS_MODE:-descriptive}
+      LLM_PROVIDER: ${LLM_PROVIDER:-disabled}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-20}
+      CHATBOT_ENABLED: ${CHATBOT_ENABLED:-false}
+      CHATBOT_PROVIDER: ${CHATBOT_PROVIDER:-local}
+      BRO24_API_KEY: ${BRO24_API_KEY:-}
+      BRO24_REPLY_JSON_PATH: ${BRO24_REPLY_JSON_PATH:-}
+      BRO24_TIMEOUT_MS: ${BRO24_TIMEOUT_MS:-8000}
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    logging: *logging
+    restart: unless-stopped
+  worker:
+    image: narxpilot-worker:local
+    build: {context: ., dockerfile: worker/Dockerfile}
+    environment:
+      <<: *common
+      WORKER_DATABASE_URL: postgresql://narxpilot_worker:${WORKER_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      OUTBOX_POLL_SECONDS: ${OUTBOX_POLL_SECONDS:-3}
+    healthcheck:
+      test: ["CMD", "python", "-m", "worker.health"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    init: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    logging: *logging
+    restart: unless-stopped
+  caddy:
+    image: caddy:2.11.7-alpine
+    environment:
+      NARXPILOT_DOMAIN: ${NARXPILOT_DOMAIN:?Domain required}
+      DEPLOY_BASIC_USER: ${DEPLOY_BASIC_USER:?Access user required}
+      DEPLOY_BASIC_HASH: ${DEPLOY_BASIC_HASH:?Run configure --finalize}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: *logging
+    restart: unless-stopped
+
+volumes:
+  database:
+  caddy_data:
+  caddy_config:
