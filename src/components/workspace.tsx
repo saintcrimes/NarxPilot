@@ -37,6 +37,6 @@ export function Workspace() {
       </main>
       <footer className="main-footer">NarxPilot <span>Наблюдения платформы, не всего рынка · Денежные расчёты на сервере</span></footer>
     </div>
-    {auth.data?.chatbot_enabled&&<HelpBoundary key={current?.user_id??'guest'}><HelpWidget/></HelpBoundary>}
+    {auth.data?.chatbot_enabled&&<HelpBoundary key={current?.user_id??'guest'}><HelpWidget csrf={auth.data.csrf} provider={auth.data.chatbot_provider} available={auth.data.chatbot_available}/></HelpBoundary>}
   </div>;
 }

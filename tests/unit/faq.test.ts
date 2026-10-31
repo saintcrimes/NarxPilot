@@ -29,9 +29,11 @@ test('F07: ограничение длины и текстовый ввод не
   assert.match(matchQuestion('a'.repeat(1001)).answer,/1000/);
   assert.match(matchQuestion('<script>alert(1)</script>').answer,/нет точного ответа/);
 });
-test('F08: FAQ не содержит внешних вызовов, API-инструментов и постоянного хранения',()=>{
-  const sources=['src/domain/faq.ts','src/components/help-widget.tsx'].map(p=>readFileSync(p,'utf8')).join('\n');
-  assert.doesNotMatch(sources,/\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB)\b/);
-  assert.doesNotMatch(sources,/from ['"].*(server|integrations)/);
+test('F08: локальный FAQ не вызывает сеть; виджет не хранит переписку и не обращается к внешнему API',()=>{
+  const domain=readFileSync('src/domain/faq.ts','utf8'),widget=readFileSync('src/components/help-widget.tsx','utf8');
+  assert.doesNotMatch(domain,/\b(fetch|XMLHttpRequest|WebSocket)\b/);
+  assert.doesNotMatch(domain+widget,/\b(localStorage|sessionStorage|indexedDB)\b/);
+  assert.doesNotMatch(widget,/https?:\/\/|BRO24_API_KEY|NEXT_PUBLIC_/);
+  assert.doesNotMatch(domain+widget,/from ['"].*(server|integrations)/);
   assert.doesNotMatch(JSON.stringify(faqItems),/https?:\/\//);
 });

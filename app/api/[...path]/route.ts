@@ -11,6 +11,7 @@ import { products,offers } from '@/server/catalog';
 import { createOrder,listOrders,getOrder,orderAction } from '@/server/orders';
 import { analytics } from '@/server/analytics';
 import { explain } from '@/server/assistant';
+import { chatbotState,productHelp } from '@/server/product-help';
 import { supplierDashboard,updateOffer,createOffer,inventoryAction } from '@/server/inventory';
 import { previewCsv,importCsv } from '@/server/csv';
 import { uuid,quantity,location,positiveAmount,createOrderSchema,orderActionSchema,offerSchema,inventorySchema } from '@/server/validation';
@@ -31,8 +32,9 @@ export async function GET(request:NextRequest,context:Context) {
     if(route==='session') {
       const s=await session(); if(!s.csrf){s.csrf=randomBytes(24).toString('hex');await s.save();}
       const profiles=isDemo()?await demoProfiles():[];
-      return {csrf:s.csrf,demo:isDemo(),chatbot_enabled:chatbotEnabled(process.env.CHATBOT_ENABLED),profiles,
-        profile:s.userId?profiles.find(p=>p.user_id===s.userId&&p.organization_id===s.organizationId)??null:null};
+      const profile=s.userId?profiles.find(p=>p.user_id===s.userId&&p.organization_id===s.organizationId)??null:null;
+      const help=chatbotState();
+      return {csrf:s.csrf,demo:isDemo(),chatbot_enabled:chatbotEnabled(process.env.CHATBOT_ENABLED),chatbot_provider:help.provider,chatbot_available:help.available&&Boolean(profile),profiles,profile};
     }
     const a=await actor(); await rateLimit(a.organizationId,600);
     if(route==='products') return products(z.string().max(120).parse(search.get('q')??''));
@@ -59,6 +61,12 @@ export async function POST(request:NextRequest,context:Context) {
     if(route==='session/demo') {await rateLimit('demo-login',120);return loginDemo(z.object({userId:uuid}).strict().parse(body).userId);}
     const a=await actor();await rateLimit('mutation:'+a.organizationId,180);
     if(route==='session/logout') {(await session()).destroy();return {ok:true};}
+    if(route==='help/chat') {
+      requireThat(chatbotEnabled(process.env.CHATBOT_ENABLED),'CHAT_DISABLED','Справка отключена',404);
+      await rateLimit('help:'+a.organizationId,10);
+      const b=z.object({message:z.string().trim().min(1).max(1000)}).strict().parse(body);
+      return productHelp(a,(await session()).csrf??'',b.message);
+    }
     if(route==='compare') {const b=z.object({skuId:uuid,quantity,location:location.default('all')}).strict().parse(body);return (await offers(b.skuId,b.quantity,b.location)).filter(o=>o.eligible);}
     if(route==='orders') return createOrder(a,createOrderSchema.parse(body),key);
     if(route==='offers') return createOffer(a,offerSchema.extend({skuId:uuid,warehouseId:uuid}).parse(body),key);

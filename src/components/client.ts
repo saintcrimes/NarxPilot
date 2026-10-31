@@ -1,7 +1,7 @@
 'use client';
 import { useCallback,useEffect,useRef,useState } from 'react';
 export type Profile={user_id:string;organization_id:string;name:string;organization_name:string;role:'buyer'|'supplier'|'admin'};
-export type SessionInfo={csrf:string;demo:boolean;chatbot_enabled:boolean;profiles:Profile[];profile:Profile|null};
+export type SessionInfo={csrf:string;demo:boolean;chatbot_enabled:boolean;chatbot_provider:'local'|'bro24';chatbot_available:boolean;profiles:Profile[];profile:Profile|null};
 export async function request<T>(path:string,options:RequestInit={}):Promise<T> {
   const response=await fetch('/api/'+path,{...options,cache:'no-store'});
   const data=await response.json();
