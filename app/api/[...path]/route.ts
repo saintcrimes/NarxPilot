@@ -10,6 +10,7 @@ import { respond,bodyOf,protectMutation,rateLimit } from '@/server/http';
 import { query } from '@/server/db';
 import { products,offers } from '@/server/catalog';
 import { createOrder,listOrders,getOrder,orderAction } from '@/server/orders';
+import { orderReceipt } from '@/server/receipt';
 import { analytics } from '@/server/analytics';
 import { explain } from '@/server/assistant';
 import { chatbotState,productHelp } from '@/server/product-help';
@@ -41,6 +42,7 @@ export async function GET(request:NextRequest,context:Context) {
     if(route==='products') return products(z.string().max(120).parse(search.get('q')??''));
     if(p[0]==='skus'&&p[2]==='offers') return offers(uuid.parse(p[1]),quantity.parse(Number(search.get('quantity')??5)),location.parse(search.get('location')??'all'),undefined,search.get('includeStale')==='true');
     if(route==='orders') return listOrders(a);
+    if(p[0]==='orders'&&p.length===3&&p[2]==='receipt') return orderReceipt(a,uuid.parse(p[1]));
     if(p[0]==='orders'&&p.length===2) return getOrder(a,uuid.parse(p[1]));
     if(p[0]==='analytics'&&p[1]) return analytics(a,uuid.parse(p[1]),z.enum(['platform','own']).parse(search.get('scope')??'platform'),location.parse(search.get('location')??'all'),z.enum(['1','2-9','10+']).parse(search.get('terms')??'2-9'));
     if(route==='supplier') return supplierDashboard(a);

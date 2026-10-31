@@ -7,6 +7,7 @@ import { Icon,Loading,Notice } from './ui';
 import { Catalog,Compare } from './catalog';
 import { AnalyticsScreen } from './analytics-screen';
 import { OrdersScreen } from './orders-screen';
+import { OrderReceipt } from './order-receipt';
 import { SupplierScreen } from './supplier-screen';
 import { NotificationsScreen } from './notifications-screen';
 import { HelpWidget,HelpBoundary } from './help-widget';
@@ -48,7 +49,7 @@ export function Workspace() {
         {(auth.error||mutation.error)&&<Notice error>{auth.error||mutation.error}</Notice>}
         {auth.loading&&<Loading/>}
         {auth.data&&!current&&<section className="welcome"><div className="welcome-art"><Icon name="chart" size={60}/><span className="tiny-pill">ФАКТЫ → РЕШЕНИЯ</span></div><p className="eyebrow">ДОБРО ПОЖАЛОВАТЬ В NARXPILOT</p><h1>Ваша следующая закупка.<br/>С понятными условиями.</h1><p>Откройте готовый демоаккаунт и пройдите путь от сравнения до приёмки. Или войдите под своим профилем.</p><div className="landing-actions">{auth.data.demo&&<button className="button primary" disabled={mutation.busy} onClick={()=>void enterDemo('/catalog')}>Попробовать демо <Icon name="arrow" size={17}/></button>}<Link className="button secondary" href="/login">Войти</Link><Link className="text-link" href="/register">Регистрация <Icon name="arrow" size={16}/></Link></div></section>}
-        {props&&current&&<div key={current.user_id}>{page==='/catalog'?<Catalog {...props}/>:page==='/compare'?<Compare {...props}/>:page==='/analytics'?<AnalyticsScreen {...props}/>:page.startsWith('/orders')?<OrdersScreen {...props} orderId={page.split('/')[2]}/>:page==='/supplier'?<SupplierScreen {...props}/>:page==='/notifications'?<NotificationsScreen {...props}/>:<Notice>Страница не найдена. Откройте каталог.</Notice>}</div>}
+        {props&&current&&<div key={current.user_id}>{page==='/catalog'?<Catalog {...props}/>:page==='/compare'?<Compare {...props}/>:page==='/analytics'?<AnalyticsScreen {...props}/>: /^\/orders\/[^/]+\/receipt$/.test(page)?<OrderReceipt {...props} orderId={page.split('/')[2]}/>:page.startsWith('/orders')?<OrdersScreen {...props} orderId={page.split('/')[2]}/>:page==='/supplier'?<SupplierScreen {...props}/>:page==='/notifications'?<NotificationsScreen {...props}/>:<Notice>Страница не найдена. Откройте каталог.</Notice>}</div>}
       </main>
       <footer className="main-footer">NarxPilot <span>Наблюдения платформы, не всего рынка · Денежные расчёты на сервере</span></footer>
     </div>{help}
